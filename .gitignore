@@ -94,3 +94,7 @@ docker-data/
 tmp/
 temp/
 .cache/
+
+
+
+JWT_SECRET=J1nHs3a0eG5T92kLp7MzCn30Gs5Tb2VJf5Qs2Qa71Mz4Lp9RVz4Lm9Rp6Xc8
