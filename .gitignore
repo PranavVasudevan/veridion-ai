@@ -1,0 +1,96 @@
+#######################################################
+# Root
+repo_structure.txt
+#######################################################
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+#######################################################
+# Node / Monorepo
+#######################################################
+
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+#######################################################
+# Backend (apps/backend)
+#######################################################
+
+apps/backend/node_modules/
+apps/backend/dist/
+apps/backend/build/
+apps/backend/coverage/
+
+# Prisma generated files
+apps/backend/node_modules/.prisma
+apps/backend/prisma/dev.db
+apps/backend/prisma/*.db
+apps/backend/prisma/*.db-journal
+
+# Test output
+apps/backend/test-results/
+
+#######################################################
+# Frontend (apps/frontend)
+#######################################################
+
+apps/frontend/node_modules/
+apps/frontend/dist/
+apps/frontend/build/
+apps/frontend/.vite/
+apps/frontend/coverage/
+
+#######################################################
+# Shared build output
+#######################################################
+
+shared/dist/
+
+#######################################################
+# Docker
+#######################################################
+
+.docker/
+docker-data/
+*.local
+
+#######################################################
+# IDE
+#######################################################
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+#######################################################
+# Misc
+#######################################################
+
+tmp/
+temp/
+.cache/
