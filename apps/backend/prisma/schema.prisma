@@ -1,0 +1,375 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//////////////////////////////////////////////////////////////
+// USER & CORE PORTFOLIO
+//////////////////////////////////////////////////////////////
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("USER")
+  createdAt DateTime @default(now())
+
+  holdings              Holding[]
+  goals                 FinancialGoal[]
+  behavioralScores      BehavioralScore[]
+  spendingMetrics       SpendingMetric[]
+  liquidityStatuses     LiquidityStatus[]
+  portfolioStates       PortfolioState[]
+  alerts                Alert[]
+  monteCarloResults     MonteCarloResult[]
+  optimizationRuns      OptimizationRun[]
+}
+
+model Holding {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  assetId     Int
+  quantity    Decimal
+  avgCost     Decimal?
+  lastUpdated DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@unique([userId, assetId])
+}
+
+model PortfolioSnapshot {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  snapshotDate DateTime @db.Date
+  totalValue   Decimal?
+  cashValue    Decimal?
+
+  @@index([userId, snapshotDate])
+}
+
+model PortfolioReturn {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  returnDate DateTime @db.Date
+  dailyReturn Decimal
+
+  @@index([userId, returnDate])
+}
+
+//////////////////////////////////////////////////////////////
+// ASSETS & MARKET DATA
+//////////////////////////////////////////////////////////////
+
+model Asset {
+  id        Int      @id @default(autoincrement())
+  ticker    String   @unique
+  name      String?
+  assetType String?
+  sector    String?
+  country   String?
+
+  prices        AssetPrice[]
+  allocations   PortfolioAllocation[]
+  riskContribs  RiskContribution[]
+  holdings Holding[]
+  eventMappings EventAssetMapping[]
+}
+
+model AssetPrice {
+  assetId   Int
+  price     Decimal
+  priceDate DateTime @db.Date
+
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@id([assetId, priceDate])
+  @@index([priceDate])
+}
+
+model EtfConstituent {
+  etfAssetId        Int
+  underlyingAssetId Int
+  weight            Decimal
+
+  @@id([etfAssetId, underlyingAssetId])
+}
+
+//////////////////////////////////////////////////////////////
+// OPTIMIZATION ENGINE
+//////////////////////////////////////////////////////////////
+
+model OptimizationRun {
+  id                       Int      @id @default(autoincrement())
+  userId                   Int
+  riskTolerance            Decimal?
+  expectedReturnAssumption Decimal?
+  volatilityAssumption     Decimal?
+  objectiveType            String?   // max_sharpe / min_volatility / etc.
+  createdAt                DateTime  @default(now())
+
+  user        User                  @relation(fields: [userId], references: [id])
+  allocations PortfolioAllocation[]
+}
+
+model PortfolioAllocation {
+  id               Int      @id @default(autoincrement())
+  optimizationRunId Int
+  assetId          Int
+  weight           Decimal
+
+  optimizationRun OptimizationRun @relation(fields: [optimizationRunId], references: [id])
+  asset           Asset           @relation(fields: [assetId], references: [id])
+}
+
+//////////////////////////////////////////////////////////////
+// RISK & PERFORMANCE METRICS
+//////////////////////////////////////////////////////////////
+
+model RiskMetricsHistory {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  volatility   Decimal?
+  sharpeRatio  Decimal?
+  sortinoRatio Decimal?
+  maxDrawdown  Decimal?
+  var95        Decimal?
+  calculatedAt DateTime @default(now())
+
+  @@index([userId, calculatedAt])
+}
+
+model RiskContribution {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  assetId     Int
+  contributionPercent Decimal
+  calculatedAt DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@index([userId])
+}
+
+//////////////////////////////////////////////////////////////
+// MONTE CARLO & GOALS
+//////////////////////////////////////////////////////////////
+
+model FinancialGoal {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  goalName     String
+  targetAmount Decimal
+  targetDate   DateTime @db.Date
+  priority     Int?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  simulations MonteCarloResult[]
+}
+
+model MonteCarloResult {
+  id                  Int      @id @default(autoincrement())
+  userId              Int
+  goalId              Int
+  numberOfSimulations Int
+  driftAssumption     Decimal?
+  volatilityAssumption Decimal?
+  goalProbability     Decimal?
+  medianProjection    Decimal?
+  worstCaseProjection Decimal?
+  inflationAdjusted   Boolean?
+  createdAt           DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  goal FinancialGoal @relation(fields: [goalId], references: [id])
+
+  @@index([userId, goalId])
+}
+
+//////////////////////////////////////////////////////////////
+// SPENDING & BEHAVIOR
+//////////////////////////////////////////////////////////////
+
+model Transaction {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  amount          Decimal
+  category        String?
+  transactionType String?
+  description     String?
+  transactionDate DateTime @db.Date
+
+  @@index([userId, transactionDate])
+}
+
+model LiquidityStatus {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  liquidityRatio  Decimal?   // liquid assets / monthly expenses
+  emergencyFundMonths Decimal?
+  stressLevel     String?    // LOW / MEDIUM / HIGH
+  calculatedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model MonthlyCashflowSummary {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  month        DateTime @db.Date
+  totalIncome  Decimal?
+  totalExpenses Decimal?
+  netSavings   Decimal?
+  updatedAt    DateTime @default(now())
+
+  @@unique([userId, month])
+}
+
+model SpendingMetric {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  monthlyBurnRate   Decimal?
+  savingsRate       Decimal?
+  expenseVolatility Decimal?
+  calculatedAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model BehavioralScore {
+  id                    Int      @id @default(autoincrement())
+  userId                Int
+  adaptiveRiskScore     Decimal?
+  panicSellScore        Decimal?
+  recencyBiasScore      Decimal?
+  riskChasingScore      Decimal?
+  liquidityStressScore  Decimal?
+  featureSnapshot       Json?
+  modelWeights          Json?
+  updatedAt             DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+//////////////////////////////////////////////////////////////
+// EVENT INTELLIGENCE
+//////////////////////////////////////////////////////////////
+
+model NewsEvent {
+  id             Int      @id @default(autoincrement())
+  headline       String
+  source         String?
+  sentimentScore Decimal?
+  eventType      String?
+  severityScore  Decimal?
+  metadata       Json?
+  publishedAt    DateTime?
+
+  mappings EventAssetMapping[]
+  impacts  PortfolioEventImpact[]
+
+  @@index([publishedAt])
+}
+
+model EventAssetMapping {
+  eventId     Int
+  assetId     Int
+  impactWeight Decimal?
+
+  event NewsEvent @relation(fields: [eventId], references: [id])
+  asset Asset     @relation(fields: [assetId], references: [id])
+
+  @@id([eventId, assetId])
+}
+
+model PortfolioEventImpact {
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  eventId            Int
+  estimatedDrawdown  Decimal?
+  volatilitySpike    Decimal?
+  impactScore        Decimal?
+  createdAt          DateTime @default(now())
+
+  event NewsEvent @relation(fields: [eventId], references: [id])
+
+  @@index([userId])
+}
+
+//////////////////////////////////////////////////////////////
+// REBALANCING & STATE
+//////////////////////////////////////////////////////////////
+
+model PortfolioDrift {
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  driftScore         Decimal?
+  maxAssetDeviation  Decimal?
+  calculatedAt       DateTime @default(now())
+
+  @@index([userId])
+}
+
+model RebalancingAction {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  triggerType String?
+  reason      String?
+  executed    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PortfolioState {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  state       String
+  healthIndex Decimal?
+  updatedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+//////////////////////////////////////////////////////////////
+// ALERTS & EXPLAINABILITY
+//////////////////////////////////////////////////////////////
+
+model Alert {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  alertType String?
+  severity  String?
+  message   String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model DecisionLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  decisionType String?
+  explanation  String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
