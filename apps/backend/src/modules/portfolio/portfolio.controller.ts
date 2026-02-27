@@ -90,7 +90,7 @@ router.patch(
   "/holdings/:id",
   asyncHandler(async (req: Request, res: Response) => {
     const { userId } = (req as AuthenticatedRequest).user;
-    const holdingId = parseInt(req.params.id);
+    const holdingId = parseInt(req.params.id as string);
     const { quantity, avgCost } = req.body;
 
     const updated = await holdingsService.updateHolding(userId, holdingId, {
@@ -107,7 +107,7 @@ router.delete(
   "/holdings/:id",
   asyncHandler(async (req: Request, res: Response) => {
     const { userId } = (req as AuthenticatedRequest).user;
-    const holdingId = parseInt(req.params.id);
+    const holdingId = parseInt(req.params.id as string);
     const result = await holdingsService.removeHolding(userId, holdingId);
     return sendSuccess(res, result);
   })

@@ -11,13 +11,13 @@ import { logger } from "../../infrastructure/logger/logger";
 
 function generateAccessToken(payload: JwtPayload): string {
   return jwt.sign(payload, env.JWT_SECRET, {
-    expiresIn: env.JWT_EXPIRES_IN,
+    expiresIn: env.JWT_EXPIRES_IN as any,
   });
 }
 
 function generateRefreshToken(payload: JwtPayload): string {
   return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRES_IN,
+    expiresIn: env.JWT_REFRESH_EXPIRES_IN as any,
   });
 }
 
@@ -88,7 +88,7 @@ export async function login(input: LoginInput) {
 
 export async function refreshAccessToken(refreshToken: string) {
   try {
-    const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as JwtPayload;
+    const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as any as JwtPayload;
 
     // Verify user still exists
     const user = await prisma.user.findUnique({

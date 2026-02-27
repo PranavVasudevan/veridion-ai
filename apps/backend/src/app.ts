@@ -64,7 +64,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   // Unknown / programmer errors
-  logger.error("Unhandled error:", err);
+  logger.error(err, "Unhandled error");
 
   return res.status(500).json({
     success: false,

@@ -38,16 +38,16 @@ async function bootstrap() {
 
   // Catch unhandled errors
   process.on("unhandledRejection", (reason) => {
-    logger.error("Unhandled Rejection:", reason);
+    logger.error(reason, "Unhandled Rejection");
   });
 
   process.on("uncaughtException", (error) => {
-    logger.error("Uncaught Exception:", error);
+    logger.error(error, "Uncaught Exception");
     process.exit(1);
   });
 }
 
 bootstrap().catch((err) => {
-  logger.error("Failed to start server:", err);
+  logger.error(err, "Failed to start server");
   process.exit(1);
 });

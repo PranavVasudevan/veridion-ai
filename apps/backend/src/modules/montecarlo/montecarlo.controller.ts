@@ -16,8 +16,8 @@ router.use(authenticate);
 router.post(
     "/:userId/:goalId",
     asyncHandler(async (req: Request, res: Response) => {
-        const userId = parseInt(req.params.userId);
-        const goalId = parseInt(req.params.goalId);
+        const userId = parseInt(req.params.userId as string);
+        const goalId = parseInt(req.params.goalId as string);
 
         const result = await monteCarloService.runSimulation(userId, goalId);
         return sendSuccess(res, result);

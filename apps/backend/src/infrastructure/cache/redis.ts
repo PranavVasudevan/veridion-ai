@@ -6,10 +6,19 @@ let client: RedisClientType | null = null;
 
 export async function connectRedis(): Promise<void> {
   try {
-    client = createClient({ url: env.REDIS_URL });
+    client = createClient({
+      url: env.REDIS_URL,
+      socket: {
+        connectTimeout: 5000,
+        reconnectStrategy: (retries: number) => {
+          if (retries > 3) return new Error("Redis connection failed");
+          return 1000;
+        },
+      },
+    });
 
     client.on("error", (err) => {
-      logger.warn("Redis client error (non-fatal, cache disabled)", err.message);
+      logger.warn(err.message, "Redis client error (non-fatal, cache disabled)");
     });
 
     await client.connect();

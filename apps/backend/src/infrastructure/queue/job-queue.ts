@@ -22,7 +22,7 @@ export interface JobDefinition {
 
 export async function enqueueJob(job: JobDefinition): Promise<void> {
   // TODO: Replace with BullMQ in Phase 2
-  logger.info(`[JobQueue] Enqueued: ${job.name}`, job.data);
+  logger.info(job.data, `[JobQueue] Enqueued: ${job.name}`);
 }
 
 export async function initJobQueue(): Promise<void> {
