@@ -13,10 +13,12 @@ export interface User {
 export interface AuthResponse {
     token: string;
     user: User;
+    isNewUser?: boolean;
 }
 
 // Portfolio
 export interface Holding {
+    id?: number;
     ticker: string;
     name: string;
     assetClass: string;
@@ -26,6 +28,9 @@ export interface Holding {
     shares: number;
     price: number;
     change24h: number;
+    avgCost?: number;
+    unrealizedPnL?: number;
+    unrealizedPnLPercent?: number;
 }
 
 export interface PortfolioSnapshot {

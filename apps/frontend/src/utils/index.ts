@@ -39,7 +39,7 @@ export function getHealthLabel(index: number): string {
 }
 
 export function isDemoMode(): boolean {
-    return import.meta.env.VITE_DEMO_MODE === 'false';
+    return import.meta.env.VITE_DEMO_MODE === 'true';
 }
 
 export function sleep(ms: number): Promise<void> {

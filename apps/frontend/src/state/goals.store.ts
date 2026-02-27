@@ -20,6 +20,8 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
         try {
             const goals = await goalsService.getGoals();
             set({ goals });
+        } catch {
+            // API may fail for new users — keep empty goals
         } finally {
             set({ isLoading: false });
         }

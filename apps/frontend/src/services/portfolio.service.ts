@@ -1,24 +1,47 @@
 import api from './api';
-import { isDemoMode, sleep } from '../utils';
-import { demoPortfolio, demoSnapshots, demoPortfolioState } from '../utils/demoData';
 import type { Portfolio, PortfolioSnapshot, PortfolioStateInfo } from '../types';
+
+export interface AddHoldingPayload {
+    ticker: string;
+    name?: string;
+    assetType?: string;
+    sector?: string;
+    country?: string;
+    quantity: number;
+    avgCost?: number;
+}
 
 export const portfolioService = {
     getPortfolio: async (): Promise<Portfolio> => {
-        if (isDemoMode()) { await sleep(400); return demoPortfolio; }
         const { data } = await api.get<Portfolio>('/portfolio');
         return data;
     },
 
     getSnapshots: async (): Promise<PortfolioSnapshot[]> => {
-        if (isDemoMode()) { await sleep(300); return demoSnapshots; }
-        const { data } = await api.get<PortfolioSnapshot[]>('/portfolio/snapshot');
-        return data;
+        const { data } = await api.get<{ snapshots: PortfolioSnapshot[] }>('/portfolio/snapshot');
+        return data.snapshots;
     },
 
     getState: async (): Promise<PortfolioStateInfo> => {
-        if (isDemoMode()) { await sleep(200); return demoPortfolioState; }
-        const { data } = await api.get<PortfolioStateInfo>('/portfolio/state');
+        const { data } = await api.get<any>('/portfolio/state');
+        return {
+            state: data.state ?? 'Stable',
+            healthIndex: data.healthIndex ?? 0,
+            message: data.message ?? `Portfolio is ${(data.state ?? 'stable').toLowerCase()}`,
+        };
+    },
+
+    addHolding: async (payload: AddHoldingPayload): Promise<any> => {
+        const { data } = await api.post('/portfolio/holdings', payload);
+        return data;
+    },
+
+    removeHolding: async (holdingId: number): Promise<void> => {
+        await api.delete(`/portfolio/holdings/${holdingId}`);
+    },
+
+    updateHolding: async (holdingId: number, payload: { quantity?: number; avgCost?: number }): Promise<any> => {
+        const { data } = await api.put(`/portfolio/holdings/${holdingId}`, payload);
         return data;
     },
 };

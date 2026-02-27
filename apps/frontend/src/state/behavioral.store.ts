@@ -17,15 +17,16 @@ export const useBehavioralStore = create<BehavioralState>((set) => ({
     isLoading: false,
     fetchAll: async () => {
         set({ isLoading: true });
-        try {
-            const [score, spending, history] = await Promise.all([
-                behavioralService.getScore(),
-                behavioralService.getSpending(),
-                behavioralService.getHistory(),
-            ]);
-            set({ score, spending, history });
-        } finally {
-            set({ isLoading: false });
-        }
+        const [scoreRes, spendingRes, historyRes] = await Promise.allSettled([
+            behavioralService.getScore(),
+            behavioralService.getSpending(),
+            behavioralService.getHistory(),
+        ]);
+        set({
+            score: scoreRes.status === 'fulfilled' ? scoreRes.value : null,
+            spending: spendingRes.status === 'fulfilled' ? spendingRes.value : null,
+            history: historyRes.status === 'fulfilled' ? historyRes.value : [],
+            isLoading: false,
+        });
     },
 }));

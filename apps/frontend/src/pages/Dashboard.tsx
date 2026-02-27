@@ -30,7 +30,7 @@ const cardVariants = {
 
 export default function Dashboard() {
     const user = useAuthStore((s) => s.user);
-    const { totalValue, holdings, state, isLoading: pLoad } = usePortfolio();
+    const { totalValue, totalReturn, holdings, snapshots, state, isLoading: pLoad } = usePortfolio();
     const { metrics, isLoading: rLoad } = useRiskMetrics();
     const { alerts } = useAlerts();
     const { goals } = useGoals();
@@ -124,12 +124,15 @@ export default function Dashboard() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between">
                         <div>
                             <p className="text-caption" style={{ color: 'var(--color-text-muted)' }}>Total Portfolio Value</p>
-                            {totalValue ? (
+                            {totalValue !== null ? (
                                 <div className="flex items-end gap-3 mt-1">
                                     <CountUp end={totalValue} prefix="$" separator="," className="text-metric" />
-                                    <span className="flex items-center gap-1 text-sm font-semibold mb-1" style={{ color: 'var(--color-success)' }}>
-                                        <TrendingUp size={14} /> +12.47%
-                                    </span>
+                                    {totalReturn !== null && (
+                                        <span className="flex items-center gap-1 text-sm font-semibold mb-1" style={{ color: totalReturn >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                                            {totalReturn >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                            {totalReturn >= 0 ? '+' : ''}{formatPercent(totalReturn)}
+                                        </span>
+                                    )}
                                 </div>
                             ) : <SkeletonLoader height="h-12" className="w-48 mt-1" />}
                         </div>
@@ -171,6 +174,25 @@ export default function Dashboard() {
                     </GlassCard>
                 </motion.div>
             </div>
+
+            {/* Portfolio Performance Chart */}
+            {snapshots.length > 0 && (
+                <motion.div variants={cardVariants} className="mb-6">
+                    <GlassCard>
+                        <h3 className="text-h3 mb-4">Portfolio Performance</h3>
+                        <Diagrams
+                            data={snapshots.map((s) => ({
+                                date: new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                value: Math.round(s.totalValue),
+                            }))}
+                            type="area"
+                            dataKeys={['value']}
+                            xKey="date"
+                            height={280}
+                        />
+                    </GlassCard>
+                </motion.div>
+            )}
 
             {/* Bottom Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
