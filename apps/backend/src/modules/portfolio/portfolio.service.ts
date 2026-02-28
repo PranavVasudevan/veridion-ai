@@ -1,193 +1,186 @@
-import { Decimal } from "@prisma/client/runtime/library";
-import { prisma } from "../../infrastructure/prisma/client";
-import { NotFoundError } from "../../core/errors";
-import { cacheGet, cacheSet } from "../../infrastructure/cache/redis";
-import { PORTFOLIO_STATES } from "../../config/constants";
-import { logger } from "../../infrastructure/logger/logger";
+import { prisma } from '../../infrastructure/prisma/client';
+import { AppError } from '../../core/errors/AppError';
+import { Decimal } from '@prisma/client/runtime/library';
 
-// ── Portfolio Summary ────────────────────────────────
-
-export interface PortfolioSummary {
-  totalValue: number;
-  cashValue: number;
-  holdingsCount: number;
-  holdings: HoldingSummary[];
-  allocationByAssetType: Record<string, number>;
-  allocationBySector: Record<string, number>;
-  currentState: string;
-  healthIndex: number | null;
+// ── Helper: convert Prisma Decimal to plain number ──
+function d(val: Decimal | null | undefined): number | null {
+    if (val == null) return null;
+    return val.toNumber();
 }
 
-interface HoldingSummary {
-  ticker: string;
-  name: string | null;
-  assetType: string | null;
-  sector: string | null;
-  quantity: number;
-  avgCost: number | null;
-  latestPrice: number | null;
-  marketValue: number | null;
-  weightPercent: number | null;
-  unrealizedPnl: number | null;
+// ══════════════════════════════════════════════════
+// GET /portfolio  —  full holdings with valuations
+// ══════════════════════════════════════════════════
+
+export interface HoldingResponse {
+    id: number;
+    ticker: string;
+    name: string;
+    assetClass: string;
+    sector: string;
+    shares: number;
+    avgCost: number | null;
+    price: number;
+    value: number;
+    weight: number;
+    change24h: number;
+    unrealizedPnL: number;
+    unrealizedPnLPercent: number;
 }
 
-export async function getPortfolioSummary(userId: number): Promise<PortfolioSummary> {
-  const cacheKey = `portfolio:${userId}:summary`;
-  const cached = await cacheGet<PortfolioSummary>(cacheKey);
-  if (cached) return cached;
+export interface PortfolioResponse {
+    totalValue: number;
+    totalReturn: number;
+    holdings: HoldingResponse[];
+}
 
-  // Get all holdings with latest price
-  const holdings = await prisma.holding.findMany({
-    where: { userId },
-    include: {
-      asset: {
-        include: {
-          prices: {
-            orderBy: { priceDate: "desc" },
-            take: 1,
-          },
-        },
-      },
-    },
-  });
+async function getPortfolio(userId: number): Promise<PortfolioResponse> {
+    // 1. Get all holdings for user, include the asset
+    const holdings = await prisma.holding.findMany({
+        where: { userId },
+        include: { asset: true },
+    });
 
-  // Get latest portfolio state
-  const latestState = await prisma.portfolioState.findFirst({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-  });
+    if (holdings.length === 0) {
+        return { totalValue: 0, totalReturn: 0, holdings: [] };
+    }
 
-  // Get latest snapshot for cash
-  const latestSnapshot = await prisma.portfolioSnapshot.findFirst({
-    where: { userId },
-    orderBy: { snapshotDate: "desc" },
-  });
+    // 2. For each holding, fetch the latest 2 prices (for change24h calc)
+    const enriched: {
+        holding: typeof holdings[0];
+        latestPrice: number;
+        prevPrice: number;
+        marketValue: number;
+    }[] = [];
 
-  // Build per-holding summaries
-  let totalValue = 0;
-  const holdingSummaries: HoldingSummary[] = holdings.map((h) => {
-    const qty = Number(h.quantity);
-    const avgCost = h.avgCost ? Number(h.avgCost) : null;
-    const latestPrice = h.asset.prices[0] ? Number(h.asset.prices[0].price) : null;
-    const marketValue = latestPrice !== null ? qty * latestPrice : null;
-    const unrealizedPnl = marketValue !== null && avgCost !== null ? marketValue - qty * avgCost : null;
+    for (const h of holdings) {
+        const latestPrices = await prisma.assetPrice.findMany({
+            where: { assetId: h.assetId },
+            orderBy: { priceDate: 'desc' },
+            take: 2,
+        });
 
-    if (marketValue !== null) totalValue += marketValue;
+        const latestPrice = latestPrices[0]?.price.toNumber() ?? 0;
+        const prevPrice = latestPrices[1]?.price.toNumber() ?? latestPrice;
+        const quantity = h.quantity.toNumber();
+        const marketValue = quantity * latestPrice;
+
+        enriched.push({ holding: h, latestPrice, prevPrice, marketValue });
+    }
+
+    // 3. Total portfolio value + return
+    const totalValue = enriched.reduce((sum, e) => sum + e.marketValue, 0);
+    const totalCost = enriched.reduce((sum, e) => {
+        const avgCost = d(e.holding.avgCost);
+        return sum + (avgCost != null ? avgCost * e.holding.quantity.toNumber() : e.marketValue);
+    }, 0);
+    const totalReturn = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0;
+
+    // 4. Build response — matches frontend Holding interface exactly
+    const holdingsResponse: HoldingResponse[] = enriched.map((e) => {
+        const quantity = e.holding.quantity.toNumber();
+        const avgCost = d(e.holding.avgCost);
+        const weight = totalValue > 0 ? e.marketValue / totalValue : 0;
+        const change24h = e.prevPrice > 0 ? ((e.latestPrice - e.prevPrice) / e.prevPrice) * 100 : 0;
+
+        let unrealizedPnL = 0;
+        let unrealizedPnLPercent = 0;
+
+        if (avgCost !== null && avgCost > 0) {
+            unrealizedPnL = (e.latestPrice - avgCost) * quantity;
+            unrealizedPnLPercent = ((e.latestPrice - avgCost) / avgCost) * 100;
+        }
+
+        return {
+            id: e.holding.id,
+            ticker: e.holding.asset.ticker,
+            name: e.holding.asset.name ?? e.holding.asset.ticker,
+            assetClass: e.holding.asset.assetType ?? 'stock',
+            sector: e.holding.asset.sector ?? 'Other',
+            shares: quantity,
+            avgCost,
+            price: e.latestPrice,
+            value: Math.round(e.marketValue * 100) / 100,
+            weight: Math.round(weight * 10000) / 10000,
+            change24h: Math.round(change24h * 100) / 100,
+            unrealizedPnL: Math.round(unrealizedPnL * 100) / 100,
+            unrealizedPnLPercent: Math.round(unrealizedPnLPercent * 100) / 100,
+        };
+    });
 
     return {
-      ticker: h.asset.ticker,
-      name: h.asset.name,
-      assetType: h.asset.assetType,
-      sector: h.asset.sector,
-      quantity: qty,
-      avgCost,
-      latestPrice,
-      marketValue,
-      weightPercent: null, // computed below
-      unrealizedPnl,
+        totalValue: Math.round(totalValue * 100) / 100,
+        totalReturn: Math.round(totalReturn * 100) / 100,
+        holdings: holdingsResponse,
     };
-  });
+}
 
-  const cashValue = latestSnapshot?.cashValue ? Number(latestSnapshot.cashValue) : 0;
-  totalValue += cashValue;
+// ══════════════════════════════════════════════════
+// GET /portfolio/snapshot  —  historical value chart
+// ══════════════════════════════════════════════════
 
-  // Compute weight percentages
-  if (totalValue > 0) {
-    for (const h of holdingSummaries) {
-      if (h.marketValue !== null) {
-        h.weightPercent = parseFloat(((h.marketValue / totalValue) * 100).toFixed(2));
-      }
+export interface SnapshotResponse {
+    date: string;              // "YYYY-MM-DD"
+    totalValue: number;
+    dailyReturn: number;
+}
+
+async function getSnapshots(userId: number): Promise<{ snapshots: SnapshotResponse[] }> {
+    const rows = await prisma.portfolioSnapshot.findMany({
+        where: { userId },
+        orderBy: { snapshotDate: 'asc' },
+    });
+
+    const snapshots: SnapshotResponse[] = rows.map((r, i) => {
+        const val = d(r.totalValue) ?? 0;
+        const prevVal = i > 0 ? (d(rows[i - 1].totalValue) ?? val) : val;
+        const dailyReturn = prevVal > 0 ? ((val - prevVal) / prevVal) * 100 : 0;
+
+        return {
+            date: r.snapshotDate.toISOString().split('T')[0],
+            totalValue: val,
+            dailyReturn: Math.round(dailyReturn * 100) / 100,
+        };
+    });
+
+    return { snapshots };
+}
+
+// ══════════════════════════════════════════════════
+// GET /portfolio/state  —  state machine + health
+// ══════════════════════════════════════════════════
+
+export interface PortfolioStateResponse {
+    state: string;
+    healthIndex: number;
+    updatedAt: string;
+}
+
+async function getState(userId: number): Promise<PortfolioStateResponse> {
+    const latest = await prisma.portfolioState.findFirst({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+    });
+
+    if (!latest) {
+        // Return default state for new users — NOT a 404
+        return {
+            state: 'New',
+            healthIndex: 0,
+            updatedAt: new Date().toISOString(),
+        };
     }
-  }
 
-  // Allocation breakdowns
-  const allocationByAssetType: Record<string, number> = {};
-  const allocationBySector: Record<string, number> = {};
-
-  for (const h of holdingSummaries) {
-    if (h.marketValue !== null && totalValue > 0) {
-      const typeKey = h.assetType || "Unknown";
-      const sectorKey = h.sector || "Unknown";
-      const weight = h.marketValue / totalValue;
-
-      allocationByAssetType[typeKey] = (allocationByAssetType[typeKey] || 0) + weight;
-      allocationBySector[sectorKey] = (allocationBySector[sectorKey] || 0) + weight;
-    }
-  }
-
-  const summary: PortfolioSummary = {
-    totalValue: parseFloat(totalValue.toFixed(2)),
-    cashValue: parseFloat(cashValue.toFixed(2)),
-    holdingsCount: holdings.length,
-    holdings: holdingSummaries,
-    allocationByAssetType,
-    allocationBySector,
-    currentState: latestState?.state || PORTFOLIO_STATES.HEALTHY,
-    healthIndex: latestState?.healthIndex ? Number(latestState.healthIndex) : null,
-  };
-
-  await cacheSet(cacheKey, summary, 60); // 1 min cache
-  return summary;
+    return {
+        state: latest.state,
+        healthIndex: latest.healthIndex?.toNumber() ?? 0,
+        updatedAt: latest.updatedAt.toISOString(),
+    };
 }
 
-// ── Portfolio Snapshots (history) ────────────────────
-
-export async function getPortfolioHistory(userId: number, days: number = 90) {
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-
-  const snapshots = await prisma.portfolioSnapshot.findMany({
-    where: {
-      userId,
-      snapshotDate: { gte: since },
-    },
-    orderBy: { snapshotDate: "asc" },
-  });
-
-  return snapshots.map((s) => ({
-    date: s.snapshotDate,
-    totalValue: s.totalValue ? Number(s.totalValue) : null,
-    cashValue: s.cashValue ? Number(s.cashValue) : null,
-  }));
-}
-
-// ── Portfolio Returns ────────────────────────────────
-
-export async function getPortfolioReturns(userId: number, days: number = 90) {
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-
-  const returns = await prisma.portfolioReturn.findMany({
-    where: {
-      userId,
-      returnDate: { gte: since },
-    },
-    orderBy: { returnDate: "asc" },
-  });
-
-  return returns.map((r) => ({
-    date: r.returnDate,
-    dailyReturn: Number(r.dailyReturn),
-  }));
-}
-
-// ── Create Portfolio Snapshot ────────────────────────
-
-export async function createSnapshot(
-  userId: number,
-  data: { totalValue: number; cashValue?: number }
-) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const snapshot = await prisma.portfolioSnapshot.create({
-    data: {
-      userId,
-      snapshotDate: today,
-      totalValue: new Decimal(data.totalValue),
-      cashValue: data.cashValue ? new Decimal(data.cashValue) : null,
-    },
-  });
-
-  return snapshot;
-}
+// ── Public API ──
+export const portfolioService = {
+    getPortfolio,
+    getSnapshots,
+    getState,
+};

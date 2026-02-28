@@ -21,17 +21,21 @@ export const useRiskStore = create<RiskState>((set) => ({
     isLoading: false,
     fetchAll: async () => {
         set({ isLoading: true });
-        try {
-            const [metrics, history, contributions, frontier, covariance] = await Promise.all([
-                riskService.getMetrics(),
-                riskService.getHistory(),
-                riskService.getContributions(),
-                riskService.getFrontier(),
-                riskService.getCovariance(),
-            ]);
-            set({ metrics, history, contributions, frontier, covariance });
-        } finally {
-            set({ isLoading: false });
-        }
+        // Fetch each independently so one failure doesn't kill the rest
+        const [metricsRes, historyRes, contribRes, frontierRes, covRes] = await Promise.allSettled([
+            riskService.getMetrics(),
+            riskService.getHistory(),
+            riskService.getContributions(),
+            riskService.getFrontier(),
+            riskService.getCovariance(),
+        ]);
+        set({
+            metrics: metricsRes.status === 'fulfilled' ? metricsRes.value : null,
+            history: historyRes.status === 'fulfilled' ? historyRes.value : [],
+            contributions: contribRes.status === 'fulfilled' ? contribRes.value : [],
+            frontier: frontierRes.status === 'fulfilled' ? frontierRes.value : [],
+            covariance: covRes.status === 'fulfilled' ? covRes.value : null,
+            isLoading: false,
+        });
     },
 }));

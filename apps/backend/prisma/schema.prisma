@@ -19,6 +19,7 @@ model User {
   role      String   @default("USER")
   createdAt DateTime @default(now())
 
+  profile               UserProfile?
   holdings              Holding[]
   goals                 FinancialGoal[]
   behavioralScores      BehavioralScore[]
@@ -28,6 +29,24 @@ model User {
   alerts                Alert[]
   monteCarloResults     MonteCarloResult[]
   optimizationRuns      OptimizationRun[]
+}
+
+model UserProfile {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  annualIncome    Decimal?
+  totalSavings    Decimal?
+  totalDebt       Decimal?
+  monthlyExpenses Decimal?
+  riskTolerance   Decimal? // 0–1
+  investmentGoal  String?  // "growth" | "income" | "preservation"
+  investmentHorizon Int?   // years
+  occupation      String?
+  country         String?
+  dateOfBirth     DateTime? @db.Date
+  updatedAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Holding {

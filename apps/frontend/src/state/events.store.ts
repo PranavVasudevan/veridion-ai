@@ -15,14 +15,14 @@ export const useEventsStore = create<EventsState>((set) => ({
     isLoading: false,
     fetchAll: async () => {
         set({ isLoading: true });
-        try {
-            const [events, exposure] = await Promise.all([
-                eventsService.getEvents(),
-                eventsService.getPortfolioExposure(),
-            ]);
-            set({ events, exposure });
-        } finally {
-            set({ isLoading: false });
-        }
+        const [eventsRes, exposureRes] = await Promise.allSettled([
+            eventsService.getEvents(),
+            eventsService.getPortfolioExposure(),
+        ]);
+        set({
+            events: eventsRes.status === 'fulfilled' ? eventsRes.value : [],
+            exposure: exposureRes.status === 'fulfilled' ? exposureRes.value : null,
+            isLoading: false,
+        });
     },
 }));

@@ -20,6 +20,8 @@ export const useAlertStore = create<AlertState>((set, get) => ({
         try {
             const data = await alertsService.getAlerts();
             set({ alerts: data, unreadCount: data.filter((a) => !a.isRead).length });
+        } catch {
+            // API may fail for new users — keep empty alerts
         } finally {
             set({ isLoading: false });
         }

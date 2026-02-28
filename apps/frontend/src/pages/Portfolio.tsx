@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { Plus, Trash2 } from 'lucide-react';
 import GlassCard from '../components/ui/GlassCard';
 import CountUp from '../components/reactbits/CountUp';
 import ScrollReveal from '../components/reactbits/ScrollReveal';
 import Diagrams from '../components/charts/Diagrams';
 import SkeletonLoader from '../components/ui/SkeletonLoader';
 import Tooltip from '../components/ui/Tooltip';
+import AddAssetModal, { AddAssetData } from '../components/ui/AddAssetModal';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useRiskMetrics } from '../hooks/useRiskMetrics';
 import { formatCurrency, formatPercent, formatDate } from '../utils/formatters';
@@ -22,12 +24,35 @@ const pageVariants = {
 export default function Portfolio() {
     const [activeTab, setActiveTab] = useState(0);
     const [timeHorizon, setTimeHorizon] = useState('1Y');
-    const { totalValue, holdings, snapshots, isLoading } = usePortfolio();
+    const [showAddAsset, setShowAddAsset] = useState(false);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const { totalValue, holdings, snapshots, isLoading, addHolding, removeHolding } = usePortfolio();
     const { contributions, frontier } = useRiskMetrics();
 
     const allocData = holdings.map((h) => ({ name: h.ticker, value: Math.round(h.weight * 100) }));
     const contribData = contributions.map((c) => ({ name: c.ticker, contribution: Math.round(c.contribution * 100) }));
     const perfData = snapshots.map((s) => ({ date: new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: Math.round(s.totalValue) }));
+
+    const handleAddAsset = async (data: AddAssetData) => {
+        await addHolding({
+            ticker: data.ticker,
+            name: data.name || undefined,
+            assetType: data.assetType,
+            sector: data.sector,
+            country: data.country,
+            quantity: data.quantity,
+            avgCost: data.avgCost || undefined,
+        });
+    };
+
+    const handleDeleteHolding = async (holdingId: number) => {
+        setDeletingId(holdingId);
+        try {
+            await removeHolding(holdingId);
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     return (
         <motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit">
@@ -35,20 +60,26 @@ export default function Portfolio() {
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-6">
                 <div>
                     <p className="text-caption" style={{ color: 'var(--color-text-muted)' }}>Total Portfolio Value</p>
-                    {totalValue ? (
+                    {totalValue !== null ? (
                         <CountUp end={totalValue} prefix="$" separator="," className="text-metric" />
                     ) : <SkeletonLoader height="h-12" className="w-48" />}
                 </div>
-                <div className="flex gap-1 mt-4 md:mt-0 p-1 rounded-xl" style={{ background: 'var(--color-bg-tertiary)' }}>
-                    {TIME_HORIZONS.map((h) => (
-                        <button key={h} onClick={() => setTimeHorizon(h)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                            style={{
-                                background: timeHorizon === h ? 'var(--color-bg-secondary)' : 'transparent',
-                                color: timeHorizon === h ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                            }}
-                        >{h}</button>
-                    ))}
+                <div className="flex gap-2 mt-4 md:mt-0">
+                    <button onClick={() => setShowAddAsset(true)}
+                        className="btn-primary flex items-center gap-2 text-sm">
+                        <Plus size={16} /> Add Asset
+                    </button>
+                    <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-bg-tertiary)' }}>
+                        {TIME_HORIZONS.map((h) => (
+                            <button key={h} onClick={() => setTimeHorizon(h)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                style={{
+                                    background: timeHorizon === h ? 'var(--color-bg-secondary)' : 'transparent',
+                                    color: timeHorizon === h ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                                }}
+                            >{h}</button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -81,7 +112,12 @@ export default function Portfolio() {
                             ) : <SkeletonLoader count={5} />}
                         </GlassCard>
                         <GlassCard>
-                            <h3 className="text-h3 mb-4">Holdings</h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-h3">Holdings</h3>
+                                <span className="text-xs font-medium px-2 py-1 rounded-lg" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}>
+                                    {holdings.length} assets
+                                </span>
+                            </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
@@ -89,7 +125,8 @@ export default function Portfolio() {
                                             <th className="text-left py-3 text-caption" style={{ color: 'var(--color-text-muted)' }}>Asset</th>
                                             <th className="text-right py-3 text-caption" style={{ color: 'var(--color-text-muted)' }}>Weight</th>
                                             <th className="text-right py-3 text-caption" style={{ color: 'var(--color-text-muted)' }}>Value</th>
-                                            <th className="text-right py-3 text-caption" style={{ color: 'var(--color-text-muted)' }}>24h</th>
+                                            <th className="text-right py-3 text-caption" style={{ color: 'var(--color-text-muted)' }}>P&L</th>
+                                            <th className="text-right py-3 text-caption" style={{ color: 'var(--color-text-muted)' }}></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -108,8 +145,18 @@ export default function Portfolio() {
                                                     </div>
                                                 </td>
                                                 <td className="text-right font-numeric">{formatCurrency(h.value)}</td>
-                                                <td className="text-right font-numeric" style={{ color: h.change24h >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                                                    {h.change24h >= 0 ? '+' : ''}{h.change24h.toFixed(2)}%
+                                                <td className="text-right font-numeric" style={{ color: (h.change24h ?? 0) >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                                                    {(h.change24h ?? 0) >= 0 ? '+' : ''}{(h.change24h ?? 0).toFixed(2)}%
+                                                </td>
+                                                <td className="text-right">
+                                                    <Tooltip content="Remove this holding">
+                                                        <button onClick={() => h.id && handleDeleteHolding(h.id)}
+                                                            disabled={deletingId === h.id}
+                                                            className="p-1.5 rounded-lg hover:bg-bg-tertiary transition-colors"
+                                                            style={{ color: 'var(--color-text-muted)', opacity: deletingId === h.id ? 0.4 : 1 }}>
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </Tooltip>
                                                 </td>
                                             </tr>
                                         ))}
@@ -166,6 +213,9 @@ export default function Portfolio() {
                     </GlassCard>
                 </ScrollReveal>
             )}
+
+            {/* Add Asset Modal */}
+            <AddAssetModal isOpen={showAddAsset} onClose={() => setShowAddAsset(false)} onAdd={handleAddAsset} />
         </motion.div>
     );
 }

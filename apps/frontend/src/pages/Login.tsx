@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Hexagon } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../hooks/useAuth';
 import GradientText from '../components/reactbits/GradientText';
 import BlurText from '../components/reactbits/BlurText';
 import Particles from '../components/reactbits/Particles';
 
 export default function Login() {
-    const { login } = useAuth();
+    const { login, googleLogin } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPwd, setShowPwd] = useState(false);
@@ -17,12 +18,16 @@ export default function Login() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!email || !password) {
+            setError('Please enter your email and password');
+            return;
+        }
         setError('');
         setLoading(true);
         try {
             await login(email, password);
         } catch {
-            setError('Invalid credentials. Try demo@veridion.ai / demo');
+            setError('Invalid email or password');
         } finally {
             setLoading(false);
         }
@@ -60,6 +65,30 @@ export default function Login() {
                     <h1 className="text-h1 mb-2">Welcome back</h1>
                     <p className="text-body mb-8" style={{ color: 'var(--color-text-secondary)' }}>Sign in to your account to continue</p>
 
+                    {/* Google Login */}
+                    <div className="flex justify-center mb-4">
+                        <GoogleLogin
+                            onSuccess={(credentialResponse) => {
+                                if (credentialResponse.credential) {
+                                    googleLogin(credentialResponse.credential);
+                                }
+                            }}
+                            onError={() => {
+                                setError('Google sign-in failed. Please try again.');
+                            }}
+                            theme="outline"
+                            size="large"
+                            width="400"
+                            text="signin_with"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>or</span>
+                        <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="text-caption block mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Email</label>
@@ -67,7 +96,7 @@ export default function Login() {
                                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
                                 <input
                                     type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="demo@veridion.ai" className="input-field pl-10"
+                                    placeholder="you@example.com" className="input-field pl-10" required
                                 />
                             </div>
                         </div>
@@ -77,7 +106,7 @@ export default function Login() {
                                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
                                 <input
                                     type={showPwd ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••" className="input-field pl-10 pr-10"
+                                    placeholder="••••••••" className="input-field pl-10 pr-10" required
                                 />
                                 <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }}>
                                     {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -100,10 +129,6 @@ export default function Login() {
                         Don't have an account?{' '}
                         <Link to="/register" className="font-medium" style={{ color: 'var(--color-accent-teal)' }}>Create one</Link>
                     </p>
-
-                    <div className="mt-6 p-3 rounded-xl text-xs text-center" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}>
-                        Demo mode: click Sign In with empty fields to explore
-                    </div>
                 </motion.div>
             </div>
         </div>
