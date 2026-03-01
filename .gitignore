@@ -22,8 +22,8 @@ pids
 Thumbs.db
 
 # Environment files
-.env
-.env.*
+#.env
+#.env.*
 !.env.example
 
 #######################################################

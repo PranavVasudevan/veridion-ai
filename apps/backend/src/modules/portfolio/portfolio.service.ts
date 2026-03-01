@@ -60,7 +60,9 @@ async function getPortfolio(userId: number): Promise<PortfolioResponse> {
             take: 2,
         });
 
-        const latestPrice = latestPrices[0]?.price.toNumber() ?? 0;
+        // Fall back to avgCost if no price data exists (e.g. manually added tickers)
+        const avgCostFallback = h.avgCost ? h.avgCost.toNumber() : 0;
+        const latestPrice = latestPrices[0]?.price.toNumber() ?? avgCostFallback;
         const prevPrice = latestPrices[1]?.price.toNumber() ?? latestPrice;
         const quantity = h.quantity.toNumber();
         const marketValue = quantity * latestPrice;

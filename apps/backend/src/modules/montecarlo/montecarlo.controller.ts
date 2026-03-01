@@ -1,12 +1,12 @@
 import { Router, Request, Response } from "express";
-import { authenticate } from "../auth/auth.middleware";
+import { authMiddleware } from "../../core/middleware/auth.middleware";
 import { asyncHandler, sendSuccess } from "../../core/utils/index";
 import { monteCarloService } from "./montecarlo.service";
 
 const router = Router();
 
 // All montecarlo routes require authentication
-router.use(authenticate);
+router.use(authMiddleware as any);
 
 /**
  * POST /montecarlo/:userId/:goalId
@@ -16,8 +16,8 @@ router.use(authenticate);
 router.post(
     "/:userId/:goalId",
     asyncHandler(async (req: Request, res: Response) => {
-        const userId = parseInt(req.params.userId);
-        const goalId = parseInt(req.params.goalId);
+        const userId = parseInt(req.params.userId as string);
+        const goalId = parseInt(req.params.goalId as string);
 
         const result = await monteCarloService.runSimulation(userId, goalId);
         return sendSuccess(res, result);

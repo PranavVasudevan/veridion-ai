@@ -46,10 +46,11 @@ export const MOBILE_NAV_ITEMS = [
 ] as const;
 
 export const ACCENT_PRESETS = [
-    { name: 'Teal', value: '#00D4AA' },
-    { name: 'Blue', value: '#3B82F6' },
-    { name: 'Purple', value: '#8B5CF6' },
-    { name: 'Gold', value: '#F5A623' },
+    { name: 'Teal', value: '#00C896' },
+    { name: 'Blue', value: '#5B8AF0' },
+    { name: 'Purple', value: '#7C3AED' },
+    { name: 'Gold', value: '#C9A84C' },
+    { name: 'Rose', value: '#E5484D' },
 ] as const;
 
 export const TIME_HORIZONS = ['1M', '3M', '6M', '1Y', 'All'] as const;
@@ -88,10 +89,10 @@ export const GLOSSARY: Record<string, string> = {
 };
 
 export const GOAL_ICONS: Record<string, string> = {
-    retirement: '🏖️',
-    house: '🏠',
-    education: '🎓',
-    custom: '🎯',
+    retirement: '',
+    house: '',
+    education: '',
+    custom: '',
 };
 
 export const SIMULATION_DEFAULTS = {

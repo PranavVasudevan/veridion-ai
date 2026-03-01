@@ -16,10 +16,11 @@ export default function BottomNav() {
 
     return (
         <nav
-            className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around py-2 border-t md:hidden"
+            className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around md:hidden backdrop-blur-xl"
             style={{
-                background: 'var(--color-bg-secondary)',
-                borderColor: 'var(--color-border)',
+                height: '60px',
+                background: 'var(--surface-glass)',
+                borderTop: '1px solid var(--border-subtle)',
                 paddingBottom: 'env(safe-area-inset-bottom, 8px)',
             }}
         >
@@ -32,11 +33,15 @@ export default function BottomNav() {
                         <button
                             key="more"
                             onClick={() => setMobileMenuOpen(true)}
-                            className="flex flex-col items-center gap-0.5 px-2 py-1 min-w-[48px]"
-                            style={{ color: 'var(--color-text-muted)' }}
+                            className="flex flex-col items-center gap-0.5 relative"
+                            style={{
+                                color: 'var(--text-tertiary)',
+                                minWidth: '48px', minHeight: '44px',
+                                padding: '6px 8px',
+                                justifyContent: 'center',
+                            }}
                         >
-                            <Icon size={20} />
-                            <span className="text-[10px] font-medium">{item.label}</span>
+                            <Icon size={20} strokeWidth={1.5} />
                         </button>
                     );
                 }
@@ -45,13 +50,28 @@ export default function BottomNav() {
                     <NavLink
                         key={item.id}
                         to={item.path}
-                        className="flex flex-col items-center gap-0.5 px-2 py-1 min-w-[48px]"
-                        style={{ color: isActive ? 'var(--color-accent-teal)' : 'var(--color-text-muted)' }}
+                        className="flex flex-col items-center gap-0.5 relative"
+                        style={{
+                            color: isActive ? 'var(--brand-primary)' : 'var(--text-tertiary)',
+                            minWidth: '48px', minHeight: '44px',
+                            padding: '6px 8px',
+                            justifyContent: 'center',
+                        }}
                     >
-                        <Icon size={20} />
-                        <span className="text-[10px] font-medium">{item.label}</span>
+                        <Icon size={20} strokeWidth={1.5} />
                         {isActive && (
-                            <div className="absolute bottom-0 w-8 h-0.5 rounded-full" style={{ background: 'var(--color-accent-teal)' }} />
+                            <>
+                                <span style={{
+                                    fontSize: '10px', fontWeight: 500,
+                                    lineHeight: 1,
+                                }}>{item.label}</span>
+                                <span style={{
+                                    width: '3px', height: '3px',
+                                    borderRadius: '50%',
+                                    background: 'var(--brand-primary)',
+                                    marginTop: '2px',
+                                }} />
+                            </>
                         )}
                     </NavLink>
                 );

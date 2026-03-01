@@ -3,9 +3,8 @@ import * as jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../../infrastructure/prisma/client';
 import { env } from '../../config/env';
-import { APP_CONSTANTS } from '../../config/constants';
-import { AppError } from '../../core/errors/AppError';
-import type { JwtPayload } from '../../core/middleware/auth.middleware';
+import { BadRequestError, UnauthorizedError } from '../../core/errors/AppError';
+export interface JwtPayload { userId: number; email: string; role: string; }
 
 interface RegisterInput {
     email: string;
@@ -47,7 +46,7 @@ async function findOrCreateGoogleUser(email: string, name: string) {
         // Google users get a random password hash (they don't use password login)
         const randomPassword = await bcrypt.hash(
             Math.random().toString(36) + Date.now().toString(36),
-            APP_CONSTANTS.BCRYPT_ROUNDS,
+            10,
         );
 
         user = await prisma.user.create({
@@ -69,10 +68,10 @@ export const authService = {
     async register(input: RegisterInput): Promise<AuthResult> {
         const existing = await prisma.user.findUnique({ where: { email: input.email } });
         if (existing) {
-            throw AppError.badRequest('Email already registered');
+            throw new BadRequestError('Email already registered');
         }
 
-        const hashedPassword = await bcrypt.hash(input.password, APP_CONSTANTS.BCRYPT_ROUNDS);
+        const hashedPassword = await bcrypt.hash(input.password, 10);
 
         const user = await prisma.user.create({
             data: {
@@ -96,12 +95,12 @@ export const authService = {
     async login(input: LoginInput): Promise<AuthResult> {
         const user = await prisma.user.findUnique({ where: { email: input.email } });
         if (!user) {
-            throw AppError.unauthorized('Invalid email or password');
+            throw new UnauthorizedError('Invalid email or password');
         }
 
         const valid = await bcrypt.compare(input.password, user.password);
         if (!valid) {
-            throw AppError.unauthorized('Invalid email or password');
+            throw new UnauthorizedError('Invalid email or password');
         }
 
         const token = signToken({ userId: user.id, email: user.email, role: user.role });
@@ -119,7 +118,7 @@ export const authService = {
      */
     async googleLogin(codeOrToken: string, isCode = true): Promise<AuthResult> {
         if (!googleClient) {
-            throw AppError.badRequest('Google OAuth is not configured. Set GOOGLE_CLIENT_ID in your .env');
+            throw new BadRequestError('Google OAuth is not configured. Set GOOGLE_CLIENT_ID in your .env');
         }
 
         let email: string;
@@ -148,7 +147,7 @@ export const authService = {
                 email = payload.email;
                 name = payload.name || email.split('@')[0];
             } catch (err: any) {
-                throw AppError.unauthorized(`Google authentication failed: ${err.message || 'Invalid code'}`);
+                throw new UnauthorizedError(`Google authentication failed: ${err.message || 'Invalid code'}`);
             }
         } else {
             // ID token flow: verify directly
@@ -166,7 +165,7 @@ export const authService = {
                 email = payload.email;
                 name = payload.name || email.split('@')[0];
             } catch {
-                throw AppError.unauthorized('Invalid Google token');
+                throw new UnauthorizedError('Invalid Google token');
             }
         }
 

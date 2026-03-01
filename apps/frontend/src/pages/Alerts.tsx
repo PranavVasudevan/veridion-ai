@@ -91,7 +91,7 @@ export default function Alerts() {
                                     <ExplainabilityModal explanation={alert.explanation}>
                                         {alert.actionSuggestion && (
                                             <p className="text-xs mt-3 p-2 rounded-lg" style={{ background: 'var(--color-accent-teal-dim)', color: 'var(--color-accent-teal)' }}>
-                                                💡 {alert.actionSuggestion}
+                                                {alert.actionSuggestion}
                                             </p>
                                         )}
                                     </ExplainabilityModal>

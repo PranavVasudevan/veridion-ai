@@ -150,7 +150,7 @@ export default function RiskAnalysis() {
                     </div>
                     {demoRiskExplanation.historicalAnalog && (
                         <p className="mt-3 text-xs italic" style={{ color: 'var(--color-text-muted)' }}>
-                            📊 {demoRiskExplanation.historicalAnalog}
+                            {demoRiskExplanation.historicalAnalog}
                         </p>
                     )}
                 </GlassCard>

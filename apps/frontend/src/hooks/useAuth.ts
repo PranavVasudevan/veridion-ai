@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../state/auth.store';
 import { authService } from '../services/auth.service';
 import { useUIStore } from '../state/ui.store';
+import { usePortfolioStore } from '../state/portfolio.store';
+import { useGoalsStore } from '../state/goals.store';
+import { useRiskStore } from '../state/risk.store';
+import { useAlertStore } from '../state/alert.store';
+import { useBehavioralStore } from '../state/behavioral.store';
+import { useEventsStore } from '../state/events.store';
 
 export function useAuth() {
     const { token, user, login: setAuth, logout: clearAuth } = useAuthStore();
@@ -52,6 +58,14 @@ export function useAuth() {
 
     const logout = useCallback(() => {
         clearAuth();
+        // Reset ALL data stores — critical to prevent cross-user data contamination
+        // Without this, user A's portfolio/risk/goals data stays visible to user B
+        usePortfolioStore.setState({ totalValue: null, totalReturn: null, holdings: [], snapshots: [], state: null, isLoading: false, error: null });
+        useGoalsStore.setState({ goals: [], mcResults: [], isLoading: false });
+        useRiskStore.setState({ metrics: null, history: [], contributions: [], frontier: [], covariance: null, isLoading: false });
+        useAlertStore.setState({ alerts: [], unreadCount: 0, isLoading: false });
+        useBehavioralStore.setState({ score: null, spending: null, history: [], isLoading: false });
+        useEventsStore.setState({ events: [], exposure: null, isLoading: false });
         navigate('/login');
     }, [clearAuth, navigate]);
 

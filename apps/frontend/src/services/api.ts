@@ -16,9 +16,16 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
-// Handle 401 → logout
+// Unwrap the { success, data } envelope automatically so callers get the inner `data`
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // Backend returns { success: true, data: <actual payload> }
+        // Unwrap so callers see response.data = <actual payload>
+        if (response.data && typeof response.data === 'object' && 'success' in response.data && 'data' in response.data) {
+            response.data = response.data.data;
+        }
+        return response;
+    },
     (error) => {
         if (error.response?.status === 401) {
             useAuthStore.getState().logout();

@@ -1,4 +1,9 @@
-import { severityColors } from '../../utils/colors';
+const severityTokens: Record<string, string> = {
+    LOW: '#4B5768',
+    MEDIUM: '#D4922B',
+    HIGH: '#E5484D',
+    CRITICAL: '#CC2A2A',
+};
 
 interface SeverityBadgeProps {
     severity: string;
@@ -6,14 +11,32 @@ interface SeverityBadgeProps {
 }
 
 export default function SeverityBadge({ severity, className = '' }: SeverityBadgeProps) {
-    const colors = severityColors[severity] || severityColors.LOW;
+    const color = severityTokens[severity] || severityTokens.LOW;
 
     return (
         <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${className}`}
-            style={{ background: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+            className={className}
+            style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-pill)',
+                fontSize: '11px',
+                fontWeight: 500,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                fontFamily: 'var(--font-mono)',
+                background: `${color}14`,
+                color: severity === 'CRITICAL' ? '#F87171' : color,
+                border: `1px solid ${color}28`,
+            }}
         >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: colors.dot }} />
+            <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: color, flexShrink: 0,
+                boxShadow: severity === 'CRITICAL' ? 'var(--glow-danger)' : 'none',
+            }} />
             {severity}
         </span>
     );

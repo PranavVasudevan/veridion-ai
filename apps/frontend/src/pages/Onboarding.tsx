@@ -117,10 +117,10 @@ export default function Onboarding() {
     };
 
     const goalOptions = [
-        { id: 'retirement', label: 'Retirement', icon: '🏖️' },
-        { id: 'house', label: 'Down Payment', icon: '🏠' },
-        { id: 'education', label: 'Education', icon: '🎓' },
-        { id: 'custom', label: 'Custom Goal', icon: '🎯' },
+        { id: 'retirement', label: 'Retirement', icon: '' },
+        { id: 'house', label: 'Down Payment', icon: '' },
+        { id: 'education', label: 'Education', icon: '' },
+        { id: 'custom', label: 'Custom Goal', icon: '' },
     ];
 
     return (

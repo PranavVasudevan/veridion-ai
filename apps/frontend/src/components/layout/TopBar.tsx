@@ -28,20 +28,31 @@ export default function TopBar() {
     const unreadCount = useAlertStore((s) => s.unreadCount);
     const portfolioState = usePortfolioStore((s) => s.state);
     const logout = useAuthStore((s) => s.logout);
+    const user = useAuthStore((s) => s.user);
 
     const title = pageTitles[location.pathname] || 'Veridion AI';
 
+    /* Avatar initials */
+    const initials = user?.name
+        ? user.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+        : 'V';
+
     return (
         <header
-            className="sticky top-0 z-30 h-16 flex items-center justify-between px-6 border-b backdrop-blur-xl"
+            className="sticky top-0 z-30 flex items-center justify-between px-6 backdrop-blur-sm"
             style={{
-                background: 'var(--color-bg-card)',
-                borderColor: 'var(--color-border)',
+                height: '52px',
+                background: 'var(--surface-raised)',
+                borderBottom: '1px solid var(--border-subtle)',
             }}
         >
             {/* Left: Title + State */}
             <div className="flex items-center gap-4">
-                <h1 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                <h1 style={{
+                    fontSize: '15px', fontWeight: 600,
+                    letterSpacing: '-0.01em',
+                    color: 'var(--text-primary)',
+                }}>
                     {title}
                 </h1>
                 {portfolioState && location.pathname === '/dashboard' && (
@@ -54,16 +65,30 @@ export default function TopBar() {
                 {/* Search / Command Palette */}
                 <button
                     onClick={() => setCommandPaletteOpen(true)}
-                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors"
+                    className="hidden md:flex items-center gap-2 text-sm"
                     style={{
-                        background: 'var(--color-bg-tertiary)',
-                        color: 'var(--color-text-muted)',
-                        border: '1px solid var(--color-border)',
+                        width: '180px',
+                        padding: '6px 12px',
+                        background: 'var(--surface-sunken)',
+                        color: 'var(--text-tertiary)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-pill)',
+                        fontSize: '12px',
+                        transition: 'all var(--duration-base) var(--ease-in-out)',
                     }}
                 >
-                    <Search size={14} />
+                    <Search size={14} strokeWidth={2} />
                     <span>Search...</span>
-                    <kbd className="ml-4 px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+                    <kbd style={{
+                        marginLeft: 'auto',
+                        padding: '1px 5px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontFamily: 'var(--font-mono)',
+                        background: 'var(--surface-overlay)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-tertiary)',
+                    }}>
                         ⌘K
                     </kbd>
                 </button>
@@ -73,25 +98,52 @@ export default function TopBar() {
                 {/* Alerts */}
                 <button
                     onClick={() => navigate('/alerts')}
-                    className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors hover:bg-bg-tertiary"
+                    className="relative flex items-center justify-center"
+                    style={{
+                        width: '36px', height: '36px',
+                        borderRadius: 'var(--radius-md)',
+                        transition: 'all var(--duration-base) var(--ease-in-out)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-overlay)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                    <Bell size={18} style={{ color: 'var(--color-text-secondary)' }} />
+                    <Bell size={18} strokeWidth={1.5} style={{ color: 'var(--text-secondary)' }} />
                     {unreadCount > 0 && (
-                        <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
-                            style={{ background: 'var(--color-danger)', color: 'white' }}
-                        >
-                            {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
+                        unreadCount <= 9
+                            ? <span className="absolute" style={{
+                                top: '8px', right: '8px',
+                                width: '6px', height: '6px',
+                                borderRadius: '50%',
+                                background: 'var(--brand-primary)',
+                            }} />
+                            : <span className="absolute flex items-center justify-center" style={{
+                                top: '4px', right: '2px',
+                                padding: '0 4px', height: '14px',
+                                borderRadius: 'var(--radius-pill)',
+                                fontSize: '9px', fontWeight: 700,
+                                background: 'var(--semantic-negative)',
+                                color: 'white',
+                            }}>9+</span>
                     )}
                 </button>
 
-                {/* User Menu */}
+                {/* Avatar */}
                 <button
                     onClick={() => { logout(); navigate('/login'); }}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors hover:bg-bg-tertiary"
+                    className="flex items-center justify-center"
                     title="Logout"
+                    style={{
+                        width: '28px', height: '28px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
+                        border: '1.5px solid var(--border-default)',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: 'var(--text-inverse)',
+                        transition: 'all var(--duration-base) var(--ease-in-out)',
+                    }}
                 >
-                    <LogOut size={18} style={{ color: 'var(--color-text-secondary)' }} />
+                    {initials}
                 </button>
             </div>
         </header>

@@ -13,7 +13,11 @@ const app = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: [
+      env.CORS_ORIGIN,
+      "http://localhost:5173",
+      "http://localhost:3000",
+    ],
     credentials: true,
   })
 );
@@ -51,7 +55,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     const body: Record<string, any> = {
       success: false,
       error: {
-        code: err.code,
+        code: err.name || "ERROR",
         message: err.message,
       },
     };
@@ -64,7 +68,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   // Unknown / programmer errors
-  logger.error("Unhandled error:", err);
+  logger.error(err, "Unhandled error:");
 
   return res.status(500).json({
     success: false,

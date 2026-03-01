@@ -1,17 +1,14 @@
-import { FastifyInstance } from 'fastify';
-import { authMiddleware } from '../../core/middleware/auth.middleware';
+import { Router, Request, Response } from 'express';
+import { authMiddleware, AuthRequest } from '../../core/middleware/auth.middleware';
 import { seedUserPortfolio } from './portfolio-seed.service';
+import { asyncHandler, sendSuccess } from '../../core/utils/index';
 
-export async function portfolioSeedController(app: FastifyInstance) {
-    app.addHook('preHandler', authMiddleware);
+export const portfolioSeedController = Router();
 
-    /**
-     * POST /portfolio/seed
-     * Initializes sample portfolio data for the authenticated user.
-     * Called after onboarding. Idempotent — skips if user already has holdings.
-     */
-    app.post('/portfolio/seed', async (request) => {
-        const userId = request.currentUser!.userId;
-        return seedUserPortfolio(userId);
-    });
-}
+portfolioSeedController.use(authMiddleware as any);
+
+portfolioSeedController.post('/portfolio/seed', asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as AuthRequest).user.userId;
+    const result = await seedUserPortfolio(userId);
+    return sendSuccess(res, result);
+}));

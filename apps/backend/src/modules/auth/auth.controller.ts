@@ -1,74 +1,47 @@
-import { FastifyInstance } from 'fastify';
+import { Router, Request, Response } from 'express';
 import { authService } from './auth.service';
-import { AppError } from '../../core/errors/AppError';
+import { asyncHandler, sendCreated, sendSuccess } from '../../core/utils/index';
+import { AppError, BadRequestError } from '../../core/errors/AppError';
 
-interface RegisterBody {
-    email: string;
-    password: string;
-    name?: string;
-}
+export const authController = Router();
 
-interface LoginBody {
-    email: string;
-    password: string;
-}
+authController.post('/auth/register', asyncHandler(async (req: Request, res: Response) => {
+    const { email, password, name } = req.body;
 
-interface GoogleBody {
-    code?: string;
-    idToken?: string;
-}
+    if (!email || !password) {
+        throw new BadRequestError('Email and password are required');
+    }
+    if (password.length < 6) {
+        throw new BadRequestError('Password must be at least 6 characters');
+    }
 
-export async function authController(app: FastifyInstance) {
-    /**
-     * POST /auth/register
-     */
-    app.post<{ Body: RegisterBody }>('/auth/register', async (request, reply) => {
-        const { email, password, name } = request.body;
+    const result = await authService.register({ email, password, name });
+    return sendCreated(res, result);
+}));
 
-        if (!email || !password) {
-            throw AppError.badRequest('Email and password are required');
-        }
-        if (password.length < 6) {
-            throw AppError.badRequest('Password must be at least 6 characters');
-        }
+authController.post('/auth/login', asyncHandler(async (req: Request, res: Response) => {
+    const { email, password } = req.body;
 
-        const result = await authService.register({ email, password, name });
-        return reply.status(201).send(result);
-    });
+    if (!email || !password) {
+        throw new BadRequestError('Email and password are required');
+    }
 
-    /**
-     * POST /auth/login
-     */
-    app.post<{ Body: LoginBody }>('/auth/login', async (request, reply) => {
-        const { email, password } = request.body;
+    const result = await authService.login({ email, password });
+    return sendSuccess(res, result);
+}));
 
-        if (!email || !password) {
-            throw AppError.badRequest('Email and password are required');
-        }
+authController.post('/auth/google', asyncHandler(async (req: Request, res: Response) => {
+    const { code, idToken } = req.body;
 
-        const result = await authService.login({ email, password });
-        return reply.send(result);
-    });
+    if (!code && !idToken) {
+        throw new BadRequestError('Google authorization code or ID token is required');
+    }
 
-    /**
-     * POST /auth/google
-     * Accepts either:
-     *   - { code: string }   → authorization code from @react-oauth/google popup
-     *   - { idToken: string } → direct ID token from Google Identity Services
-     */
-    app.post<{ Body: GoogleBody }>('/auth/google', async (request, reply) => {
-        const { code, idToken } = request.body;
-
-        if (!code && !idToken) {
-            throw AppError.badRequest('Google authorization code or ID token is required');
-        }
-
-        if (code) {
-            const result = await authService.googleLogin(code, true);
-            return reply.send(result);
-        } else {
-            const result = await authService.googleLogin(idToken!, false);
-            return reply.send(result);
-        }
-    });
-}
+    if (code) {
+        const result = await authService.googleLogin(code, true);
+        return sendSuccess(res, result);
+    } else {
+        const result = await authService.googleLogin(idToken!, false);
+        return sendSuccess(res, result);
+    }
+}));

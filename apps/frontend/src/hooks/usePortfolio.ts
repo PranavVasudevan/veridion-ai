@@ -1,18 +1,15 @@
 import { useEffect } from 'react';
 import { usePortfolioStore } from '../state/portfolio.store';
+import { useAuthStore } from '../state/auth.store';
 
 export function usePortfolio() {
     const store = usePortfolioStore();
+    const userId = useAuthStore((s) => s.user?.id);
 
     useEffect(() => {
-        // Use totalValue === null to detect "never fetched" state
-        // (totalValue of 0 is valid for new users with no holdings)
-        if (store.totalValue === null && !store.isLoading) {
-            store.fetchPortfolio();
-            store.fetchState();
-            store.fetchSnapshots();
-        }
-    }, []);
+        if (!userId) return;
+        store.refreshAll();
+    }, [userId]);
 
     return store;
 }

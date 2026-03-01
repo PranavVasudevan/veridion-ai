@@ -84,63 +84,107 @@ export default function CommandPalette() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+                        className="fixed inset-0 z-50"
+                        style={{
+                            background: 'rgba(8, 12, 20, 0.85)',
+                            backdropFilter: 'blur(8px)',
+                        }}
                         onClick={() => setCommandPaletteOpen(false)}
                     />
 
                     {/* Palette */}
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                        initial={{ opacity: 0, scale: 0.96, y: -8 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -20 }}
-                        transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-                        className="fixed top-[15%] left-1/2 -translate-x-1/2 z-50 w-full max-w-lg"
+                        exit={{ opacity: 0, scale: 0.96, y: -8 }}
+                        transition={{ duration: 0.2, ease: [0.19, 1, 0.22, 1] }}
+                        className="fixed top-[15%] left-1/2 -translate-x-1/2 z-50 w-full"
+                        style={{ maxWidth: '560px' }}
                     >
-                        <div
-                            className="glass overflow-hidden"
-                            style={{ borderColor: 'var(--color-border-hover)' }}
-                        >
+                        <div style={{
+                            background: 'var(--surface-overlay)',
+                            border: '1px solid var(--border-strong)',
+                            borderRadius: 'var(--radius-xl)',
+                            boxShadow: 'var(--shadow-elevated), 0 0 0 1px rgba(0,200,150,0.1)',
+                            overflow: 'hidden',
+                            maxHeight: '420px',
+                        }}>
                             {/* Search input */}
-                            <div className="flex items-center gap-3 px-4 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                                <Search size={18} style={{ color: 'var(--color-text-muted)' }} />
+                            <div className="flex items-center gap-3" style={{
+                                padding: '0 16px',
+                                height: '52px',
+                                borderBottom: '1px solid var(--border-subtle)',
+                            }}>
+                                <Search size={16} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
                                 <input
                                     ref={inputRef}
                                     type="text"
                                     value={query}
                                     onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
                                     onKeyDown={handleKeyDown}
-                                    placeholder="Search commands..."
-                                    className="flex-1 bg-transparent outline-none text-sm"
-                                    style={{ color: 'var(--color-text-primary)' }}
+                                    placeholder="Search pages, actions..."
+                                    className="flex-1 bg-transparent outline-none"
+                                    style={{
+                                        color: 'var(--text-primary)',
+                                        fontSize: '15px',
+                                        fontWeight: 450,
+                                    }}
                                 />
-                                <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                                <kbd style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontFamily: 'var(--font-mono)',
+                                    background: 'var(--surface-sunken)',
+                                    color: 'var(--text-tertiary)',
+                                    border: '1px solid var(--border-subtle)',
+                                }}>
                                     ESC
                                 </kbd>
                             </div>
 
                             {/* Results */}
-                            <div className="max-h-80 overflow-y-auto py-2">
+                            <div className="overflow-y-auto" style={{ maxHeight: '360px', padding: '4px 0' }}>
                                 {filtered.length === 0 && (
-                                    <div className="px-4 py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                                    <div style={{
+                                        padding: '32px 16px',
+                                        textAlign: 'center',
+                                        fontSize: '13px',
+                                        color: 'var(--text-tertiary)',
+                                    }}>
                                         No results found
                                     </div>
                                 )}
                                 {filtered.map((item, i) => {
                                     const Icon = icons[item.icon];
+                                    const isSelected = i === selectedIndex;
                                     return (
                                         <button
                                             key={item.id}
                                             onClick={() => handleSelect(item)}
                                             onMouseEnter={() => setSelectedIndex(i)}
-                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors"
+                                            className="w-full flex items-center gap-3 text-left"
                                             style={{
-                                                color: 'var(--color-text-primary)',
-                                                background: i === selectedIndex ? 'var(--color-bg-tertiary)' : 'transparent',
+                                                height: '40px',
+                                                padding: '0 12px',
+                                                fontSize: '13px',
+                                                fontWeight: 500,
+                                                color: 'var(--text-primary)',
+                                                background: isSelected ? 'var(--brand-primary-dim)' : 'transparent',
+                                                borderLeft: isSelected ? '2px solid var(--brand-primary)' : '2px solid transparent',
+                                                transition: 'all 80ms ease',
                                             }}
                                         >
-                                            {Icon && <Icon size={16} className="flex-shrink-0" />}
+                                            {Icon && <Icon size={16} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />}
                                             <span className="flex-1">{item.label}</span>
-                                            <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}>
+                                            <span style={{
+                                                fontSize: '10px',
+                                                fontFamily: 'var(--font-mono)',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                background: 'var(--surface-sunken)',
+                                                color: 'var(--text-tertiary)',
+                                            }}>
                                                 {item.category}
                                             </span>
                                         </button>

@@ -1,0 +1,2 @@
+src/modules/dashboard/dashboard.controller.ts(58,74): error TS2353: Object literal may only specify known properties, and 'runDate' does not exist in type 'MonteCarloResultOrderByWithRelationInput | MonteCarloResultOrderByWithRelationInput[]'.
+src/modules/dashboard/dashboard.controller.ts(157,60): error TS2339: Property 'createdAt' does not exist on type '{ id: number; headline: string; source: string | null; sentimentScore: Decimal | null; eventType: string | null; severityScore: Decimal | null; metadata: JsonValue; publishedAt: Date | null; }'.

@@ -1,0 +1,8 @@
+src/core/interfaces/index.ts(7,18): error TS2430: Interface 'AuthenticatedRequest' incorrectly extends interface 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+  Types of property 'user' are incompatible.
+    Property 'name' is missing in type 'import("C:/Users/HP/OneDrive/Desktop/Yashwanth/Veridion/veridion-lat/veridion-ai/apps/backend/src/core/types/index").JwtPayload' but required in type 'import("C:/Users/HP/OneDrive/Desktop/Yashwanth/Veridion/veridion-lat/veridion-ai/apps/backend/src/core/middleware/auth").JwtPayload'.
+src/modules/montecarlo/montecarlo.service.ts(21,59): error TS2554: Expected 0-1 arguments, but got 2.
+src/modules/montecarlo/montecarlo.service.ts(31,61): error TS2554: Expected 0-1 arguments, but got 2.
+src/modules/montecarlo/montecarlo.service.ts(40,55): error TS2554: Expected 0-1 arguments, but got 2.
+src/modules/portfolio/holdings.service.ts(108,40): error TS2554: Expected 0-1 arguments, but got 2.
+src/modules/portfolio/holdings.service.ts(146,40): error TS2554: Expected 0-1 arguments, but got 2.

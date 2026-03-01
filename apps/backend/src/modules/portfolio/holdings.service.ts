@@ -1,6 +1,6 @@
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "../../infrastructure/prisma/client";
-import { NotFoundError, BadRequestError, ConflictError } from "../../core/errors";
+import { NotFoundError, BadRequestError } from "../../core/errors";
 import { cacheDel } from "../../infrastructure/cache/redis";
 import { logger } from "../../infrastructure/logger/logger";
 
@@ -8,6 +8,10 @@ import { logger } from "../../infrastructure/logger/logger";
 
 export interface CreateHoldingInput {
   ticker: string;
+  name?: string;       // Asset display name (e.g. "Apple Inc.")
+  assetType?: string;  // 'stock' | 'etf' | 'crypto' | etc.
+  sector?: string;     // 'Technology' | 'Healthcare' | etc.
+  country?: string;    // 'US' | 'UK' | etc.
   quantity: number;
   avgCost?: number;
 }
@@ -47,46 +51,80 @@ export async function getUserHoldings(userId: number) {
 }
 
 export async function addHolding(userId: number, input: CreateHoldingInput) {
-  // Find or create the asset by ticker
-  let asset = await prisma.asset.findUnique({
-    where: { ticker: input.ticker.toUpperCase().trim() },
-  });
-
-  if (!asset) {
-    asset = await prisma.asset.create({
-      data: { ticker: input.ticker.toUpperCase().trim() },
-    });
-    logger.info(`Auto-created asset: ${asset.ticker}`);
-  }
-
-  // Check for duplicate holding
-  const existing = await prisma.holding.findUnique({
-    where: {
-      userId_assetId: { userId, assetId: asset.id },
-    },
-  });
-
-  if (existing) {
-    throw new ConflictError(`You already have a holding for ${asset.ticker}. Use PATCH to update.`);
-  }
-
   if (input.quantity <= 0) {
     throw new BadRequestError("Quantity must be greater than 0");
   }
 
-  const holding = await prisma.holding.create({
-    data: {
-      userId,
-      assetId: asset.id,
-      quantity: new Decimal(input.quantity),
-      avgCost: input.avgCost ? new Decimal(input.avgCost) : null,
+  const ticker = input.ticker.toUpperCase().trim();
+
+  // Upsert the asset — always update name/sector/type/country if provided,
+  // so manually added metadata is persisted correctly
+  const asset = await prisma.asset.upsert({
+    where: { ticker },
+    create: {
+      ticker,
+      name: input.name || null,
+      assetType: input.assetType || null,
+      sector: input.sector || null,
+      country: input.country || null,
     },
-    include: {
-      asset: {
-        select: { id: true, ticker: true, name: true, assetType: true, sector: true, country: true },
-      },
+    update: {
+      // Only update fields if new values are provided (don't wipe existing data)
+      ...(input.name ? { name: input.name } : {}),
+      ...(input.assetType ? { assetType: input.assetType } : {}),
+      ...(input.sector ? { sector: input.sector } : {}),
+      ...(input.country ? { country: input.country } : {}),
     },
   });
+
+  logger.info(`Upserted asset: ${asset.ticker}`);
+
+  // Upsert: if the user already holds this asset, ADD to the existing quantity
+  // (like buying more shares of the same stock — no 409 ever)
+  const existing = await prisma.holding.findUnique({
+    where: { userId_assetId: { userId, assetId: asset.id } },
+  });
+
+  let holding;
+
+  if (existing) {
+    const existingQty = existing.quantity.toNumber();
+    const newQty = existingQty + input.quantity;
+
+    // Weighted average cost calculation
+    let newAvgCost: number | null = existing.avgCost ? existing.avgCost.toNumber() : null;
+    if (input.avgCost && input.avgCost > 0) {
+      if (newAvgCost !== null && newAvgCost > 0) {
+        newAvgCost = (existingQty * newAvgCost + input.quantity * input.avgCost) / newQty;
+      } else {
+        newAvgCost = input.avgCost;
+      }
+    }
+
+    holding = await prisma.holding.update({
+      where: { id: existing.id },
+      data: {
+        quantity: new Decimal(newQty),
+        avgCost: newAvgCost !== null && newAvgCost > 0 ? new Decimal(newAvgCost) : undefined,
+        lastUpdated: new Date(),
+      },
+      include: {
+        asset: { select: { id: true, ticker: true, name: true, assetType: true, sector: true, country: true } },
+      },
+    });
+  } else {
+    holding = await prisma.holding.create({
+      data: {
+        userId,
+        assetId: asset.id,
+        quantity: new Decimal(input.quantity),
+        avgCost: input.avgCost && input.avgCost > 0 ? new Decimal(input.avgCost) : null,
+      },
+      include: {
+        asset: { select: { id: true, ticker: true, name: true, assetType: true, sector: true, country: true } },
+      },
+    });
+  }
 
   await cacheDel(`portfolio:${userId}:*`);
 
@@ -138,6 +176,9 @@ export async function updateHolding(userId: number, holdingId: number, input: Up
 }
 
 export async function removeHolding(userId: number, holdingId: number) {
+  // Scope the lookup to BOTH holdingId AND userId.
+  // This prevents a user from deleting another user's holding,
+  // and gives a proper 404 if the ID doesn't belong to them.
   const holding = await prisma.holding.findFirst({
     where: { id: holdingId, userId },
   });

@@ -12,10 +12,10 @@ export const prisma =
     log:
       env.NODE_ENV === "development"
         ? [
-            { level: "query", emit: "event" },
-            { level: "error", emit: "stdout" },
-            { level: "warn", emit: "stdout" },
-          ]
+          { level: "query", emit: "event" },
+          { level: "error", emit: "stdout" },
+          { level: "warn", emit: "stdout" },
+        ]
         : [{ level: "error", emit: "stdout" }],
   });
 
@@ -34,7 +34,7 @@ export async function connectDatabase(): Promise<void> {
     await prisma.$connect();
     logger.info("✅ Database connected");
   } catch (error) {
-    logger.error("❌ Database connection failed", error);
+    logger.error(error instanceof Error ? error : new Error(String(error)), "❌ Database connection failed");
     process.exit(1);
   }
 }

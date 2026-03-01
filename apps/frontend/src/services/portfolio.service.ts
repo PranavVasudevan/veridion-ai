@@ -11,6 +11,15 @@ export interface AddHoldingPayload {
     avgCost?: number;
 }
 
+export interface AllocationItem {
+    assetId: number;
+    ticker: string;
+    name: string | null;
+    currentWeight: number;
+    targetWeight: number | null;
+    deviation: number | null;
+}
+
 export const portfolioService = {
     getPortfolio: async (): Promise<Portfolio> => {
         const { data } = await api.get<Portfolio>('/portfolio');
@@ -31,6 +40,11 @@ export const portfolioService = {
         };
     },
 
+    getAllocation: async (): Promise<AllocationItem[]> => {
+        const { data } = await api.get<AllocationItem[]>('/portfolio/allocation');
+        return data;
+    },
+
     addHolding: async (payload: AddHoldingPayload): Promise<any> => {
         const { data } = await api.post('/portfolio/holdings', payload);
         return data;
@@ -42,6 +56,11 @@ export const portfolioService = {
 
     updateHolding: async (holdingId: number, payload: { quantity?: number; avgCost?: number }): Promise<any> => {
         const { data } = await api.put(`/portfolio/holdings/${holdingId}`, payload);
+        return data;
+    },
+
+    seed: async (): Promise<{ seeded: boolean }> => {
+        const { data } = await api.post<{ seeded: boolean }>('/portfolio/seed');
         return data;
     },
 };

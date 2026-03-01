@@ -40,6 +40,10 @@ export const env = {
 
   // Logging
   LOG_LEVEL: getEnv("LOG_LEVEL", "info"),
+
+  // Google OAuth
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
 } as const;
 
 export type Env = typeof env;

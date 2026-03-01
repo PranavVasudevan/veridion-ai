@@ -9,38 +9,62 @@ const iconMap = {
     info: Info,
 };
 
-const colorMap = {
-    success: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', icon: '#10B981' },
-    error: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', icon: '#EF4444' },
-    warning: { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)', icon: '#F59E0B' },
-    info: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', icon: '#3B82F6' },
+const accentColors = {
+    success: '#1DB876',
+    error: '#E5484D',
+    warning: '#D4922B',
+    info: '#5B8AF0',
 };
 
 export default function ToastNotification() {
     const { toasts, removeToast } = useUIStore();
 
     return (
-        <div className="fixed top-4 right-4 z-[100] flex flex-col gap-3 max-w-sm">
+        <div className="fixed z-[100] flex flex-col gap-2" style={{
+            bottom: '16px', right: '16px',
+            maxWidth: '320px',
+        }}>
             <AnimatePresence>
                 {toasts.map((toast) => {
                     const Icon = iconMap[toast.type];
-                    const colors = colorMap[toast.type];
+                    const accent = accentColors[toast.type];
                     return (
                         <motion.div
                             key={toast.id}
-                            initial={{ opacity: 0, x: 50, scale: 0.95 }}
-                            animate={{ opacity: 1, x: 0, scale: 1 }}
-                            exit={{ opacity: 0, x: 50, scale: 0.95 }}
-                            transition={{ duration: 0.3 }}
-                            className="glass p-4 flex items-start gap-3"
-                            style={{ borderColor: colors.border, background: colors.bg }}
+                            initial={{ opacity: 0, x: 'calc(100% + 16px)' }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 'calc(100% + 16px)' }}
+                            transition={{ duration: 0.32, ease: [0.19, 1, 0.22, 1] }}
+                            className="flex items-start gap-3 relative overflow-hidden"
+                            style={{
+                                padding: '12px 14px',
+                                background: 'var(--surface-overlay)',
+                                border: '1px solid var(--border-default)',
+                                borderRadius: 'var(--radius-lg)',
+                                boxShadow: 'var(--shadow-elevated)',
+                            }}
                         >
-                            <Icon size={18} style={{ color: colors.icon }} className="mt-0.5 flex-shrink-0" />
+                            {/* Left accent bar */}
+                            <div style={{
+                                position: 'absolute', left: 0, top: 0, bottom: 0,
+                                width: '3px', background: accent,
+                                borderRadius: 'var(--radius-lg) 0 0 var(--radius-lg)',
+                            }} />
+                            <Icon size={16} style={{ color: accent, flexShrink: 0, marginTop: '1px' }} />
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>{toast.title}</p>
-                                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{toast.message}</p>
+                                <p style={{
+                                    fontSize: '13px', fontWeight: 500,
+                                    color: 'var(--text-primary)',
+                                }}>{toast.title}</p>
+                                <p style={{
+                                    fontSize: '12px', marginTop: '2px',
+                                    color: 'var(--text-secondary)',
+                                }}>{toast.message}</p>
                             </div>
-                            <button onClick={() => removeToast(toast.id)} className="text-text-muted hover:text-text-primary transition-colors">
+                            <button
+                                onClick={() => removeToast(toast.id)}
+                                style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}
+                            >
                                 <X size={14} />
                             </button>
                         </motion.div>

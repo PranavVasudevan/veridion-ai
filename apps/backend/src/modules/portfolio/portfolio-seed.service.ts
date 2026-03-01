@@ -93,55 +93,63 @@ export async function seedUserPortfolio(userId: number): Promise<{ seeded: boole
         });
     }
 
-    // ── 4. Portfolio Snapshots (90 days) ──
-    let snapshotValue = 115000;
-    for (let day = 90; day >= 0; day--) {
-        snapshotValue = snapshotValue + (Math.random() - 0.45) * 600;
-        snapshotValue = Math.round(snapshotValue * 100) / 100;
-        const snapshotDate = dateNDaysAgo(day);
+    // ── 4. Portfolio Snapshots (90 days) — only if none exist ──
+    const existingSnapshots = await prisma.portfolioSnapshot.count({ where: { userId } });
+    if (existingSnapshots === 0) {
+        let snapshotValue = 115000;
+        for (let day = 90; day >= 0; day--) {
+            snapshotValue = snapshotValue + (Math.random() - 0.45) * 600;
+            snapshotValue = Math.round(snapshotValue * 100) / 100;
+            const snapshotDate = dateNDaysAgo(day);
 
-        await prisma.portfolioSnapshot.create({
+            await prisma.portfolioSnapshot.create({
+                data: {
+                    userId,
+                    snapshotDate,
+                    totalValue: new Prisma.Decimal(snapshotValue),
+                    cashValue: new Prisma.Decimal(Math.round(4500 + Math.random() * 1000)),
+                },
+            });
+        }
+    }
+
+    // ── 5. Portfolio State — only if none exists ──
+    const existingState = await prisma.portfolioState.findFirst({ where: { userId } });
+    if (!existingState) {
+        await prisma.portfolioState.create({
+            data: { userId, state: 'Stable', healthIndex: new Prisma.Decimal(78.5) },
+        });
+    }
+
+    // ── 6. Risk Metrics — only if none exists ──
+    const existingRisk = await prisma.riskMetricsHistory.findFirst({ where: { userId } });
+    if (!existingRisk) {
+        await prisma.riskMetricsHistory.create({
             data: {
                 userId,
-                snapshotDate,
-                totalValue: new Prisma.Decimal(snapshotValue),
-                cashValue: new Prisma.Decimal(Math.round(4500 + Math.random() * 1000)),
+                volatility: new Prisma.Decimal(0.1823),
+                sharpeRatio: new Prisma.Decimal(1.42),
+                sortinoRatio: new Prisma.Decimal(1.89),
+                maxDrawdown: new Prisma.Decimal(-0.2341),
+                var95: new Prisma.Decimal(-0.0312),
             },
         });
     }
 
-    // ── 5. Portfolio State ──
-    await prisma.portfolioState.create({
-        data: {
-            userId,
-            state: 'Stable',
-            healthIndex: new Prisma.Decimal(78.5),
-        },
-    });
-
-    // ── 6. Risk Metrics ──
-    await prisma.riskMetricsHistory.create({
-        data: {
-            userId,
-            volatility: new Prisma.Decimal(0.1823),
-            sharpeRatio: new Prisma.Decimal(1.42),
-            sortinoRatio: new Prisma.Decimal(1.89),
-            maxDrawdown: new Prisma.Decimal(-0.2341),
-            var95: new Prisma.Decimal(-0.0312),
-        },
-    });
-
-    // ── 7. Behavioral Score ──
-    await prisma.behavioralScore.create({
-        data: {
-            userId,
-            adaptiveRiskScore: new Prisma.Decimal(62.5),
-            panicSellScore: new Prisma.Decimal(0.31),
-            recencyBiasScore: new Prisma.Decimal(0.44),
-            riskChasingScore: new Prisma.Decimal(0.18),
-            liquidityStressScore: new Prisma.Decimal(0.22),
-        },
-    });
+    // ── 7. Behavioral Score — only if none exists ──
+    const existingBehavioral = await prisma.behavioralScore.findFirst({ where: { userId } });
+    if (!existingBehavioral) {
+        await prisma.behavioralScore.create({
+            data: {
+                userId,
+                adaptiveRiskScore: new Prisma.Decimal(62.5),
+                panicSellScore: new Prisma.Decimal(0.31),
+                recencyBiasScore: new Prisma.Decimal(0.44),
+                riskChasingScore: new Prisma.Decimal(0.18),
+                liquidityStressScore: new Prisma.Decimal(0.22),
+            },
+        });
+    }
 
     // ── 8. Sample Alerts ──
     const alertsData = [

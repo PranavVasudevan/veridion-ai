@@ -1,13 +1,18 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
 interface AnimatedListProps {
-    children: ReactNode[];
+    children: ReactNode;
     className?: string;
     staggerDelay?: number;
 }
 
 export default function AnimatedList({ children, className = '', staggerDelay = 0.08 }: AnimatedListProps) {
+    // Use React.Children.toArray to safely handle single child, multiple children,
+    // or even null/undefined — prevents "children.map is not a function" crashes
+    const items = React.Children.toArray(children);
+
     return (
         <motion.div
             className={className}
@@ -18,7 +23,7 @@ export default function AnimatedList({ children, className = '', staggerDelay = 
                 visible: { transition: { staggerChildren: staggerDelay } },
             }}
         >
-            {children.map((child, i) => (
+            {items.map((child, i) => (
                 <motion.div
                     key={i}
                     variants={{

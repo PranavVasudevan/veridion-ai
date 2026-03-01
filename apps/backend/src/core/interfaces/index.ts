@@ -5,5 +5,5 @@ import { JwtPayload } from "../types";
  * Express Request augmented with authenticated user info.
  */
 export interface AuthenticatedRequest extends Request {
-  user: JwtPayload;
+  user?: any;
 }

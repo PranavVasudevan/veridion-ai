@@ -11,8 +11,13 @@ export default function SkeletonLoader({ className = '', count = 1, height = 'h-
             {Array.from({ length: count }).map((_, i) => (
                 <div
                     key={i}
-                    className={`shimmer ${height} ${rounded} w-full`}
-                    style={{ background: 'var(--color-bg-tertiary)' }}
+                    className={`${height} ${rounded} w-full`}
+                    style={{
+                        background: 'linear-gradient(90deg, var(--surface-overlay) 0%, var(--surface-sunken) 40%, rgba(255,255,255,0.04) 50%, var(--surface-sunken) 60%, var(--surface-overlay) 100%)',
+                        backgroundSize: '200% 100%',
+                        animation: 'shimmer 1.6s ease-in-out infinite',
+                        borderRadius: 'var(--radius-sm)',
+                    }}
                 />
             ))}
         </div>

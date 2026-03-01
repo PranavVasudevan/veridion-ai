@@ -26,15 +26,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
     return (
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Routes>
                 {/* Public */}
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/onboarding" element={<Onboarding />} />
 
-                {/* Protected App */}
+                {/* Protected — /onboarding is inside so the JWT exists when redirecting to /dashboard */}
                 <Route
                     element={
                         <ProtectedRoute>
@@ -42,6 +41,7 @@ export default function App() {
                         </ProtectedRoute>
                     }
                 >
+                    <Route path="/onboarding" element={<Onboarding />} />
                     <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
                     <Route path={ROUTES.PORTFOLIO} element={<Portfolio />} />
                     <Route path={ROUTES.RISK} element={<RiskAnalysis />} />
