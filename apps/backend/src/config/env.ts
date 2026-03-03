@@ -42,8 +42,15 @@ export const env = {
   LOG_LEVEL: getEnv("LOG_LEVEL", "info"),
 
   // Google OAuth
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
-  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+  GOOGLE_CLIENT_ID: getEnv("GOOGLE_CLIENT_ID", ""),
+  GOOGLE_CLIENT_SECRET: getEnv("GOOGLE_CLIENT_SECRET", ""),
+
+  // News / Events
+  NEWS_PROVIDER: getEnv("NEWS_PROVIDER", "massive"), // default to massive
+  MASSIVE_API_KEY: getEnv("MASSIVE_API_KEY"),
+  ALPACA_API_KEY: getEnv("ALPACA_API_KEY", ""),
+  ALPACA_API_SECRET: getEnv("ALPACA_API_SECRET", ""),
+  NEWSAPI_KEY: getEnv("NEWSAPI_KEY", ""),
 } as const;
 
 export type Env = typeof env;

@@ -1,15 +1,46 @@
 import { useEffect } from 'react';
 import { useEventsStore } from '../state/events.store';
-import { useAuthStore } from '../state/auth.store';
 
+/**
+ * useEvents
+ *
+ * Wraps the events Zustand store and handles initial fetching.
+ * Drop-in replacement for any demo/mock usage in EventInsights.tsx.
+ *
+ * Usage:
+ *   const { events, exposure, simulation, isLoading, simulateShock } = useEvents();
+ */
 export function useEvents() {
-    const store = useEventsStore();
-    const userId = useAuthStore((s) => s.user?.id);
+  const {
+    events,
+    exposure,
+    simulation,
+    isLoading,
+    isSimulating,
+    error,
+    fetchEvents,
+    fetchExposure,
+    simulateShock: _simulate,
+    clearSimulation,
+  } = useEventsStore();
 
-    useEffect(() => {
-        if (!userId) return;
-        store.fetchAll();
-    }, [userId]);
+  useEffect(() => {
+    fetchEvents();
+    fetchExposure();
+  }, []);
 
-    return store;
+  const simulateShock = (eventId: number) => {
+    _simulate(eventId);
+  };
+
+  return {
+    events,
+    exposure,
+    simulation,
+    isLoading,
+    isSimulating,
+    error,
+    simulateShock,
+    clearSimulation,
+  };
 }

@@ -1,79 +1,163 @@
 import { Router, Request, Response } from 'express';
-import { authMiddleware, AuthRequest } from '../../core/middleware/auth.middleware';
-import { asyncHandler, sendSuccess } from '../../core/utils/index';
 import { prisma } from '../../infrastructure/prisma/client';
+import { authMiddleware, AuthRequest } from '../../core/middleware/auth.middleware';
+import { asyncHandler, sendSuccess, sendCreated } from '../../core/utils';
+import { BadRequestError } from '../../core/errors';
+
+import { NewsIngestionService } from './news-ingestion.service';
+import { SentimentService } from './sentiment.service';
+import { EventClassifier } from './event-classifier';
+import { SeverityScorer } from './severity-scorer';
+import { ExposureMapper } from './exposure-mapper';
+import { ShockSimulator } from './shock-simulator';
+import { logger } from '../../infrastructure/logger/logger';
+import { runProcessingPipeline } from './event.processing';
 
 export const eventsController = Router();
 
+// ─────────────────────────────────────────────────────────
+// Services (singletons)
+// ─────────────────────────────────────────────────────────
+
+const ingestion = new NewsIngestionService(prisma);
+const sentiment = new SentimentService();
+const classifier = new EventClassifier();
+const severityScorer = new SeverityScorer();
+const exposureMapper = new ExposureMapper(prisma);
+const shockSimulator = new ShockSimulator(prisma);
+
+// All routes require authentication
 eventsController.use(authMiddleware as any);
 
-// GET /events
-eventsController.get('/', asyncHandler(async (req: Request, res: Response) => {
-    let events: any[] = [];
-    try {
-        events = await prisma.newsEvent.findMany({
-            orderBy: { publishedAt: 'desc' },
-            take: 20,
-        });
-    } catch {
-        return sendSuccess(res, []);
+// ═══════════════════════════════════════════════════════
+// GET /events — list processed events
+// ═══════════════════════════════════════════════════════
+
+eventsController.get(
+  '/',
+  asyncHandler(async (req: Request, res: Response) => {
+    const {
+      severity,
+      eventType,
+      since,
+      limit = '30',
+      offset = '0',
+    } = req.query as Record<string, string>;
+
+    const where: Record<string, any> = { processed: true };
+
+    if (severity) {
+      const severities = Array.isArray(severity) ? severity : [severity];
+      where.severity = { in: severities };
     }
 
-    return sendSuccess(res, events.map(e => ({
+    if (eventType) {
+      const types = Array.isArray(eventType) ? eventType : [eventType];
+      where.eventType = { in: types };
+    }
+
+    if (since) {
+      where.publishedAt = { gte: new Date(since) };
+    }
+
+    const [events, total] = await Promise.all([
+      prisma.newsEvent.findMany({
+        where,
+        orderBy: [
+          { severity: 'asc' },
+          { sentiment: 'desc' },
+          { publishedAt: 'desc' }
+        ],
+        take: Math.min(Number(limit), 100),
+        skip: Number(offset),
+      }),
+      prisma.newsEvent.count({ where }),
+    ]);
+
+    return sendSuccess(res, {
+      events: events.map((e) => ({
         id: e.id,
         headline: e.headline,
-        summary: (e.metadata as any)?.summary ?? '',
-        source: e.source ?? 'Unknown',
-        publishedAt: e.publishedAt?.toISOString() ?? new Date().toISOString(),
-        eventType: e.eventType ?? 'macro_event',
-        severity: e.severityScore ? (Number(e.severityScore) > 0.7 ? 'HIGH' : Number(e.severityScore) > 0.4 ? 'MEDIUM' : 'LOW') : 'MEDIUM',
-        sentiment: e.sentimentScore ? Number(e.sentimentScore) : 0,
-        affectedSectors: (e.metadata as any)?.sectors ?? [],
-    })));
-}));
-
-// GET /events/impact — events with portfolio exposure calculation
-eventsController.get('/impact', asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as AuthRequest).user.userId;
-
-    const holdings = await prisma.holding.findMany({
-        where: { userId },
-        include: { asset: true },
+        summary: e.summary,
+        source: e.source,
+        url: e.url,
+        publishedAt: e.publishedAt.toISOString(),
+        severity: e.severity,
+        eventType: e.eventType,
+        sentiment: e.sentiment ? Number(e.sentiment) : 0,
+        sentimentLabel: e.sentimentLabel,
+        affectedSectors: e.affectedSectors,
+        affectedTickers: e.affectedTickers,
+        processed: e.processed,
+        createdAt: e.createdAt.toISOString(),
+        updatedAt: e.updatedAt.toISOString(),
+      })),
+      total,
+      limit: Number(limit),
+      offset: Number(offset),
     });
+  })
+);
 
-    let events: any[] = [];
-    try {
-        events = await prisma.newsEvent.findMany({
-            orderBy: { publishedAt: 'desc' },
-            take: 5,
-        });
-    } catch {
-        return sendSuccess(res, []);
+// ═══════════════════════════════════════════════════════
+// GET /events/exposure — portfolio exposure
+// ═══════════════════════════════════════════════════════
+
+eventsController.get(
+  '/exposure',
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as AuthRequest).user.userId;
+    const exposure = await exposureMapper.computeExposure(userId);
+    return sendSuccess(res, { exposure });
+  })
+);
+
+// ═══════════════════════════════════════════════════════
+// POST /events/simulate — shock simulation
+// ═══════════════════════════════════════════════════════
+
+eventsController.post(
+  '/simulate',
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as AuthRequest).user.userId;
+    const { eventId } = req.body;
+
+    if (!eventId) {
+      throw new BadRequestError('eventId is required');
     }
 
-    const impactData = events.map(event => {
-        const sentiment = event.sentimentScore ? Number(event.sentimentScore) : 0;
-        const severity = event.severityScore ? Number(event.severityScore) : 0.3;
-        const sectors: string[] = (event.metadata as any)?.sectors ?? [];
+    const result = await shockSimulator.simulate(Number(eventId), userId);
+    return sendSuccess(res, result);
+  })
+);
 
-        const exposedHoldings = holdings
-            .filter(h => sectors.includes(h.asset.sector ?? ''))
-            .map(h => ({
-                ticker: h.asset.ticker,
-                exposure: 1,
-                estimatedImpact: sentiment * -0.05 * h.quantity.toNumber(),
-            }));
+// ═══════════════════════════════════════════════════════
+// POST /events/process — manual processing trigger
+// ═══════════════════════════════════════════════════════
 
-        return {
-            eventId: event.id,
-            headline: event.headline,
-            severity: severity > 0.7 ? 'HIGH' : severity > 0.4 ? 'MEDIUM' : 'LOW',
-            sentiment,
-            estimatedDrawdown: Math.abs(sentiment) * 0.05,
-            volatilityProjection: 0.15 + Math.abs(sentiment) * 0.1,
-            exposedHoldings,
-        };
+eventsController.post(
+  '/process',
+  asyncHandler(async (_req: Request, res: Response) => {
+    const processed = await runProcessingPipeline();
+    return sendSuccess(res, { processed });
+  })
+);
+
+// ═══════════════════════════════════════════════════════
+// POST /events/ingest — trigger ingestion
+// ═══════════════════════════════════════════════════════
+
+eventsController.post(
+  '/ingest',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { tickers, limit } = req.body ?? {};
+
+    const fresh = await ingestion.ingestLatest({ tickers, limit });
+    const processed = await runProcessingPipeline();
+
+    return sendCreated(res, {
+      ingested: fresh.length,
+      processed,
     });
-
-    return sendSuccess(res, impactData);
-}));
+  })
+);

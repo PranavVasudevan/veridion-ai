@@ -1,40 +1,52 @@
-import api from './api';
-import { isDemoMode, sleep } from '../utils';
-import { demoEvents, demoEventImpact, demoPortfolioExposure } from '../utils/demoData';
-import type { NewsEvent, EventImpact, PortfolioExposure } from '../types';
+import apiClient from './api';
+import {
+  GetEventsQuery,
+  GetEventsResponse,
+  ExposureReport,
+  ShockSimulationResult,
+} from '../../../shared/types/event.types';
 
 export const eventsService = {
-    getEvents: async (): Promise<NewsEvent[]> => {
-        if (isDemoMode()) { await sleep(300); return demoEvents; }
-        try {
-            const { data } = await api.get<any>('/events');
-            const arr = Array.isArray(data) ? data : [];
-            return arr.map((e: any) => ({
-                id: e.id,
-                headline: e.headline,
-                summary: e.summary ?? '',
-                source: e.source ?? 'Unknown',
-                publishedAt: e.publishedAt,
-                eventType: e.eventType ?? 'macro_event',
-                severity: e.severity ?? 'MEDIUM',
-                sentiment: e.sentiment ?? 0,
-                affectedSectors: e.affectedSectors ?? [],
-            }));
-        } catch { return demoEvents; }
-    },
-    getEventImpact: async (eventId: number): Promise<EventImpact> => {
-        if (isDemoMode()) { await sleep(400); return { ...demoEventImpact, eventId }; }
-        try {
-            const { data } = await api.get<any[]>('/events/impact');
-            const found = (data ?? []).find((e: any) => e.eventId === eventId);
-            return found ?? { ...demoEventImpact, eventId };
-        } catch { return { ...demoEventImpact, eventId }; }
-    },
-    getPortfolioExposure: async (): Promise<PortfolioExposure> => {
-        if (isDemoMode()) { await sleep(250); return demoPortfolioExposure; }
-        try {
-            const { data } = await api.get<any[]>('/events/impact');
-            return demoPortfolioExposure;
-        } catch { return demoPortfolioExposure; }
-    },
+  async getEvents(query: GetEventsQuery = {}): Promise<GetEventsResponse> {
+    const params = new URLSearchParams();
+
+    if (query.since) params.set('since', query.since);
+    if (query.limit != null) params.set('limit', String(query.limit));
+    if (query.offset != null) params.set('offset', String(query.offset));
+
+    if (query.severity) {
+      const severities = Array.isArray(query.severity)
+        ? query.severity
+        : [query.severity];
+      severities.forEach((s) => params.append('severity', s));
+    }
+
+    if (query.eventType) {
+      const types = Array.isArray(query.eventType)
+        ? query.eventType
+        : [query.eventType];
+      types.forEach((t) => params.append('eventType', t));
+    }
+
+    const { data } = await apiClient.get<GetEventsResponse>(
+      `/events?${params}`
+    );
+
+    return data;
+  },
+
+  async getExposure(): Promise<ExposureReport> {
+    const { data } = await apiClient.get<{ exposure: ExposureReport }>(
+      '/events/exposure'
+    );
+    return data.exposure;
+  },
+
+  async simulateShock(eventId: number): Promise<ShockSimulationResult> {
+    const { data } = await apiClient.post<ShockSimulationResult>(
+      '/events/simulate',
+      { eventId }
+    );
+    return data;
+  },
 };

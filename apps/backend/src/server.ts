@@ -4,6 +4,7 @@ import { connectDatabase, disconnectDatabase } from "./infrastructure/prisma/cli
 import { connectRedis } from "./infrastructure/cache/redis";
 import { initJobQueue } from "./infrastructure/queue/job-queue";
 import { logger } from "./infrastructure/logger/logger";
+import { startNewsScheduler } from './modules/jobs/news-scheduler';
 
 async function bootstrap() {
   // 1. Connect infrastructure
@@ -15,6 +16,7 @@ async function bootstrap() {
   const server = app.listen(env.PORT, () => {
     logger.info(`🚀 Server running on http://localhost:${env.PORT}`);
     logger.info(`   Environment: ${env.NODE_ENV}`);
+    startNewsScheduler();
   });
 
   // 3. Graceful shutdown

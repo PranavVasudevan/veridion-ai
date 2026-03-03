@@ -17,7 +17,7 @@ import { demoEventImpact } from '../utils/demoData';
 const pageV = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0, transition: { duration: 0.4 } }, exit: { opacity: 0 } };
 
 export default function EventInsights() {
-    const { events, exposure, isLoading } = useEvents();
+    const { events, exposure, simulation, simulateShock, isLoading } = useEvents();
     const [expandedEvent, setExpandedEvent] = useState<number | null>(null);
 
     const sentimentAvg = events.length > 0 ? events.reduce((s, e) => s + e.sentiment, 0) / events.length : 0;
@@ -72,7 +72,11 @@ export default function EventInsights() {
                                         const typeColor = eventTypeColors[ev.eventType] || eventTypeColors.macro_event;
                                         const card = (
                                             <div key={ev.id} className="p-4 rounded-xl border transition-colors cursor-pointer" style={{ background: 'var(--color-bg-tertiary)', borderColor: isExpanded ? 'var(--color-border-hover)' : 'var(--color-border)' }}
-                                                onClick={() => setExpandedEvent(isExpanded ? null : ev.id)}
+                                                onClick={() => {
+                                                    setExpandedEvent(isExpanded ? null : ev.id);
+                                                    simulateShock(ev.id);
+                                                    }
+                                                }
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className="flex-1 min-w-0">
@@ -127,26 +131,44 @@ export default function EventInsights() {
             </div>
 
             {/* Shock Simulation */}
-            <ScrollReveal>
-                <GlassCard>
-                    <h3 className="text-h3 mb-4">Shock Simulation</h3>
-                    <p className="text-body mb-4" style={{ color: 'var(--color-text-secondary)' }}>Click on any event above to see estimated portfolio impact.</p>
+            <motion.div
+                initial={{ y: 80, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="fixed bottom-0 left-0 right-0 z-50 px-6 pb-4"
+                >
+                <div className="max-w-7xl mx-auto">
+                    <GlassCard className="shadow-xl backdrop-blur-lg">
+                    <h3 className="text-h3 mb-3">Shock Simulation</h3>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="p-4 rounded-xl" style={{ background: 'var(--color-bg-tertiary)' }}>
-                            <p className="text-caption" style={{ color: 'var(--color-text-muted)' }}>Est. Drawdown</p>
-                            <p className="text-xl font-bold font-numeric mt-1" style={{ color: 'var(--color-danger)' }}>{(demoEventImpact.estimatedDrawdown * 100).toFixed(1)}%</p>
+                        <div className="p-4 rounded-xl bg-[var(--color-bg-tertiary)]">
+                        <p className="text-caption text-muted">Est. Drawdown</p>
+                        <p className="text-xl font-bold font-numeric mt-1 text-danger">
+                            {simulation
+                            ? `${(simulation.estimatedDrawdown * 100).toFixed(1)}%`
+                            : '—'}
+                        </p>
                         </div>
-                        <div className="p-4 rounded-xl" style={{ background: 'var(--color-bg-tertiary)' }}>
-                            <p className="text-caption" style={{ color: 'var(--color-text-muted)' }}>Vol. Projection</p>
-                            <p className="text-xl font-bold font-numeric mt-1">{(demoEventImpact.volatilityProjection * 100).toFixed(1)}%</p>
+
+                        <div className="p-4 rounded-xl bg-[var(--color-bg-tertiary)]">
+                        <p className="text-caption text-muted">Vol. Projection</p>
+                        <p className="text-xl font-bold font-numeric mt-1">
+                            {simulation
+                            ? `${(simulation.volatilityProjection * 100).toFixed(1)}%`
+                            : '—'}
+                        </p>
                         </div>
-                        <div className="p-4 rounded-xl" style={{ background: 'var(--color-bg-tertiary)' }}>
-                            <p className="text-caption" style={{ color: 'var(--color-text-muted)' }}>Exposed Holdings</p>
-                            <p className="text-xl font-bold font-numeric mt-1">{demoEventImpact.exposedHoldings.length}</p>
+
+                        <div className="p-4 rounded-xl bg-[var(--color-bg-tertiary)]">
+                        <p className="text-caption text-muted">Exposed Holdings</p>
+                        <p className="text-xl font-bold font-numeric mt-1">
+                            {simulation ? simulation.exposedHoldings.length : 0}
+                        </p>
                         </div>
                     </div>
-                </GlassCard>
-            </ScrollReveal>
+                    </GlassCard>
+                </div>
+            </motion.div>
         </motion.div>
     );
 }
