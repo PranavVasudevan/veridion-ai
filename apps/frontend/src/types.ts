@@ -118,6 +118,19 @@ export interface MonteCarloResult {
     };
 }
 
+// Stress-test simulation (Simulation Lab)
+export interface StressTestResult {
+    initialValue: number;
+    coneData: { period: number; p10: number; p25: number; p50: number; p75: number; p90: number }[];
+    terminalValues: number[];
+    probLoss: number;
+    median: number;
+    mean: number;
+    expectedDrawdown: number;
+    holdingsCount: number;
+    largestHolding: { ticker: string; value: number } | null;
+}
+
 // Goals
 export interface FinancialGoal {
     id: number;
