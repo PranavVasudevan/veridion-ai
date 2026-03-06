@@ -2,24 +2,27 @@ import { useEffect } from "react";
 import { useBehavioralStore } from "../state/behavioral.store";
 
 export function useBehavioral() {
-    const {
-        scores,
-        spending,
-        adaptiveRisk,
-        history,
-        isLoading,
-        fetchAll,
-    } = useBehavioralStore();
 
-    useEffect(() => {
-        fetchAll();
-    }, [fetchAll]);
+  const {
+    scores,
+    adaptiveRisk,
+    wallet,
+    trades,
+    history,
+    isLoading,
+    fetchAll,
+  } = useBehavioralStore();
 
-    return {
-        scores,
-        spending,
-        adaptiveRisk,
-        history,
-        isLoading,
-    };
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  return {
+    scores,
+    adaptiveRisk,
+    wallet,
+    trades,
+    history,
+    isLoading,
+  };
 }

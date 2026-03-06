@@ -20,7 +20,26 @@ export interface AllocationItem {
     deviation: number | null;
 }
 
+export interface WalletInfo {
+    balance: number;
+}
+
+export interface BuyPayload {
+    ticker: string;
+    quantity: number;
+    price: number;
+}
+
+export interface SellPayload {
+    holdingId: number;
+    quantity: number;
+    price: number;
+}
+
 export const portfolioService = {
+
+    // ─── Portfolio Core ─────────────────────────────
+
     getPortfolio: async (): Promise<Portfolio> => {
         const { data } = await api.get<Portfolio>('/portfolio');
         return data;
@@ -33,6 +52,7 @@ export const portfolioService = {
 
     getState: async (): Promise<PortfolioStateInfo> => {
         const { data } = await api.get<any>('/portfolio/state');
+
         return {
             state: data.state ?? 'Stable',
             healthIndex: data.healthIndex ?? 0,
@@ -45,6 +65,8 @@ export const portfolioService = {
         return data;
     },
 
+    // ─── Holdings CRUD (existing system) ────────────
+
     addHolding: async (payload: AddHoldingPayload): Promise<any> => {
         const { data } = await api.post('/portfolio/holdings', payload);
         return data;
@@ -54,7 +76,10 @@ export const portfolioService = {
         await api.delete(`/portfolio/holdings/${holdingId}`);
     },
 
-    updateHolding: async (holdingId: number, payload: { quantity?: number; avgCost?: number }): Promise<any> => {
+    updateHolding: async (
+        holdingId: number,
+        payload: { quantity?: number; avgCost?: number }
+    ): Promise<any> => {
         const { data } = await api.put(`/portfolio/holdings/${holdingId}`, payload);
         return data;
     },
@@ -62,5 +87,32 @@ export const portfolioService = {
     seed: async (): Promise<{ seeded: boolean }> => {
         const { data } = await api.post<{ seeded: boolean }>('/portfolio/seed');
         return data;
+    },
+
+    // ─── Wallet ─────────────────────────────────────
+
+    getWallet: async (): Promise<WalletInfo> => {
+        const { data } = await api.get<WalletInfo>('/portfolio/wallet');
+        return data;
+    },
+
+    deposit: async (amount: number): Promise<WalletInfo> => {
+        const { data } = await api.post<WalletInfo>('/portfolio/wallet/deposit', { amount });
+        return data;
+    },
+
+    withdraw: async (amount: number): Promise<WalletInfo> => {
+        const { data } = await api.post<WalletInfo>('/portfolio/wallet/withdraw', { amount });
+        return data;
+    },
+
+    // ─── Trades ─────────────────────────────────────
+
+    buy: async (payload: BuyPayload): Promise<void> => {
+        await api.post('/portfolio/trades/buy', payload);
+    },
+
+    sell: async (payload: SellPayload): Promise<void> => {
+        await api.post('/portfolio/trades/sell', payload);
     },
 };

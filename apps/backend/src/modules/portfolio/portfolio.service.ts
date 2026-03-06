@@ -1,6 +1,8 @@
 import { prisma } from '../../infrastructure/prisma/client';
 import { AppError } from '../../core/errors/AppError';
+import { BadRequestError } from '../../core/errors';
 import { Decimal } from '@prisma/client/runtime/library';
+import * as tradeService from './trade.service';
 
 // ── Helper: convert Prisma Decimal to plain number ──
 function d(val: Decimal | null | undefined): number | null {
@@ -180,9 +182,128 @@ async function getState(userId: number): Promise<PortfolioStateResponse> {
     };
 }
 
+// ══════════════════════════════════════════════════
+// GET /portfolio/wallet  —  user trading balance
+// ══════════════════════════════════════════════════
+
+async function getWallet(userId: number) {
+
+    let wallet = await prisma.wallet.findUnique({
+        where: { userId }
+    });
+
+    if (!wallet) {
+        wallet = await prisma.wallet.create({
+            data: {
+                userId,
+                balance: new Decimal(0)
+            }
+        });
+    }
+
+    return {
+        balance: wallet.balance.toNumber()
+    };
+}
+
+async function deposit(userId: number, amount: number) {
+
+    const wallet = await prisma.wallet.upsert({
+        where: { userId },
+        create: {
+            userId,
+            balance: new Decimal(amount)
+        },
+        update: {
+            balance: {
+                increment: amount
+            }
+        }
+    });
+
+    return {
+        balance: wallet.balance.toNumber()
+    };
+}
+
+async function withdraw(userId: number, amount: number) {
+
+    const wallet = await prisma.wallet.findUnique({
+        where: { userId }
+    });
+
+    if (!wallet) {
+        throw new BadRequestError("Wallet not found");
+    }
+
+    if (wallet.balance.toNumber() < amount) {
+        throw new BadRequestError("Insufficient balance");
+    }
+
+    const updated = await prisma.wallet.update({
+        where: { userId },
+        data: {
+            balance: {
+                decrement: amount
+            }
+        }
+    });
+
+    return {
+        balance: updated.balance.toNumber()
+    };
+}
+
+// ══════════════════════════════════════════════════
+// GET /portfolio/trades  —  recent trade history
+// ══════════════════════════════════════════════════
+
+export interface TradeResponse {
+    id: number;
+    assetTicker: string;
+    side: 'BUY' | 'SELL';
+    quantity: number;
+    price: number;
+    total: number;
+    createdAt: string;
+}
+
+async function getTrades(userId: number, limit = 10): Promise<TradeResponse[]> {
+
+    const rows = await prisma.trade.findMany({
+        where: { userId },
+        include: { asset: true },
+        orderBy: { createdAt: 'desc' },
+        take: Math.min(limit, 50)
+    });
+
+    return rows.map(t => {
+
+        const price = t.price.toNumber();
+        const qty = t.quantity.toNumber();
+
+        return {
+            id: t.id,
+            assetTicker: t.asset.ticker,
+            side: t.side as 'BUY' | 'SELL',
+            quantity: qty,
+            price,
+            total: price * qty,
+            createdAt: t.createdAt.toISOString()
+        };
+
+    });
+}
+
 // ── Public API ──
 export const portfolioService = {
     getPortfolio,
     getSnapshots,
     getState,
+    getWallet,
+    deposit,
+    withdraw,
+    getTrades,
+    executeBuy: tradeService.executeBuy,
+    executeSell: tradeService.executeSell
 };

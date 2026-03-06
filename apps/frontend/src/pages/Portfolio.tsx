@@ -154,6 +154,150 @@ function EditHoldingModal({ holding, onClose, onSave }: {
     );
 }
 
+// ─── Sell Modal ─────────────────────────────────────────────────────
+function SellModal({
+    holding,
+    onClose,
+    onSell
+}: {
+    holding: any;
+    onClose: () => void;
+    onSell: (qty: number, price: number) => Promise<void>;
+}) {
+    const [qty, setQty] = useState(holding.shares);
+    const [price, setPrice] = useState(holding.price);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+            onClick={e => e.target === e.currentTarget && onClose()}
+        >
+            <motion.div
+                initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+                className="w-full max-w-sm rounded-2xl overflow-hidden"
+                style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+            >
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                                style={{ background: 'rgba(251, 191, 36, 0.15)' }}>
+                                <DollarSign size={15} style={{ color: 'var(--color-warning)' }} />
+                            </div>
+                            <div>
+                                <h3 className="text-h3">Sell {holding.ticker}</h3>
+                                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                    Available: {holding.shares} shares
+                                </p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="p-2 rounded-lg" style={{ color: 'var(--color-text-muted)' }}>
+                            <X size={16} />
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-xs mb-1 block" style={{ color: 'var(--color-text-muted)' }}>Quantity</label>
+                            <input
+                                type="number"
+                                max={holding.shares}
+                                step="0.01"
+                                min="0.01"
+                                className="input-field"
+                                value={qty}
+                                onChange={e => setQty(Number(e.target.value))}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs mb-1 block" style={{ color: 'var(--color-text-muted)' }}>Price ($)</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="input-field"
+                                value={price}
+                                onChange={e => setPrice(Number(e.target.value))}
+                            />
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button className="btn-secondary flex-1" onClick={onClose}>
+                                Cancel
+                            </button>
+                            <button
+                                className="btn-primary flex-1"
+                                onClick={() => onSell(qty, price)}
+                            >
+                                Sell
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
+// ─── Wallet Modal ───────────────────────────────────────────────────
+function WalletModal({
+    title,
+    onConfirm,
+    onClose
+}: {
+    title: string;
+    onConfirm: (amount: number) => Promise<void>;
+    onClose: () => void;
+}) {
+    const [amount, setAmount] = useState(0);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+            onClick={e => e.target === e.currentTarget && onClose()}
+        >
+            <motion.div
+                initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+                className="w-full max-w-sm rounded-2xl overflow-hidden"
+                style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+            >
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-5">
+                        <h3 className="text-h3">{title}</h3>
+                        <button onClick={onClose} className="p-2 rounded-lg" style={{ color: 'var(--color-text-muted)' }}>
+                            <X size={16} />
+                        </button>
+                    </div>
+                    <div>
+                        <label className="text-xs mb-1 block" style={{ color: 'var(--color-text-muted)' }}>Amount ($)</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="input-field"
+                            value={amount}
+                            onChange={e => setAmount(Number(e.target.value))}
+                        />
+                    </div>
+                    <div className="flex gap-3 mt-4">
+                        <button className="btn-secondary flex-1" onClick={onClose}>
+                            Cancel
+                        </button>
+                        <button
+                            className="btn-primary flex-1"
+                            onClick={() => onConfirm(amount)}
+                        >
+                            Confirm
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // PORTFOLIO PAGE
 // ═══════════════════════════════════════════════════════════════════════
@@ -162,11 +306,15 @@ export default function Portfolio() {
         totalValue, totalReturn, holdings, snapshots, allocation, state,
         isLoading, isMutating, error: storeError,
         addHolding, updateHolding, removeHolding, clearError,
+        wallet, deposit, withdraw, executeBuy, executeSell
     } = usePortfolio();
 
     const [showAddAsset, setShowAddAsset] = useState(false);
     const [editHolding, setEditHolding] = useState<typeof holdings[0] | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<typeof holdings[0] | null>(null);
+    const [sellTarget, setSellTarget] = useState<typeof holdings[0] | null>(null);
+    const [showDeposit, setShowDeposit] = useState(false);
+    const [showWithdraw, setShowWithdraw] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState<SortField>('value');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -211,35 +359,21 @@ export default function Portfolio() {
 
     // Snapshot chart data
     const perfData = useMemo(() => {
-
         const history = snapshots.map(s => ({
             date: new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             value: Math.round(s.totalValue),
         }));
         if (totalValue) {
-            history.push({
-                date: "Now",
-                value: Math.round(totalValue)
-            });
+            history.push({ date: "Now", value: Math.round(totalValue) });
         }
         return history;
     }, [snapshots, totalValue]);
 
     const filteredPerfData = useMemo(() => {
-
         if (range === "ALL") return perfData;
-
-        const daysMap = {
-            "1W": 7,
-            "1M": 30,
-            "3M": 90,
-            "1Y": 365
-        };
-
+        const daysMap = { "1W": 7, "1M": 30, "3M": 90, "1Y": 365 };
         const days = daysMap[range];
-
         return perfData.slice(-days);
-
     }, [range, perfData]);
 
     // Current vs target allocation data
@@ -249,27 +383,38 @@ export default function Portfolio() {
             Current: Math.round(a.currentWeight * 10000) / 100,
             Target: a.targetWeight != null ? Math.round(a.targetWeight * 10000) / 100 : null,
         }))
-        , [allocation]);
+    , [allocation]);
 
     const hasTargets = allocation.some(a => a.targetWeight != null);
 
     // ─── Handlers ────────────────────────────────────────────────────
     const handleAddAsset = async (data: AddAssetData) => {
-        await addHolding({
+        await executeBuy({
             ticker: data.ticker,
-            name: data.name || undefined,
-            assetType: data.assetType,
-            sector: data.sector,
-            country: data.country,
             quantity: data.quantity,
-            avgCost: data.avgCost || undefined,
+            price: data.avgCost,
         });
+        setShowAddAsset(false);
     };
 
     const handleDelete = async () => {
-        if (!deleteTarget?.id) return;
-        await removeHolding(deleteTarget.id);
+        if (!deleteTarget) return;
+        await executeSell({
+            holdingId: deleteTarget.id,
+            quantity: deleteTarget.shares,
+            price: deleteTarget.price,
+        });
         setDeleteTarget(null);
+    };
+
+    const handleSell = async (qty: number, price: number) => {
+        if (!sellTarget) return;
+        await executeSell({
+            holdingId: sellTarget.id,
+            quantity: qty,
+            price,
+        });
+        setSellTarget(null);
     };
 
     const toggleSort = (field: SortField) => {
@@ -320,6 +465,35 @@ export default function Portfolio() {
             {/* ─── Section 2: Summary Cards ───────────────────────────────── */}
             <ScrollReveal>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    {/* Wallet */}
+                    <GlassCard className="py-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                                    Available Cash
+                                </p>
+                                <p className="text-3xl font-bold font-numeric">
+                                    {formatCurrency(wallet?.balance ?? 0)}
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowDeposit(true)}
+                                    className="btn-secondary text-xs"
+                                >
+                                    Deposit
+                                </button>
+                                <button
+                                    onClick={() => setShowWithdraw(true)}
+                                    className="btn-secondary text-xs"
+                                >
+                                    Withdraw
+                                </button>
+                            </div>
+                        </div>
+                    </GlassCard>
+
                     {/* Total Value */}
                     <GlassCard className="py-5">
                         <div className="flex items-center gap-3 mb-2">
@@ -516,6 +690,7 @@ export default function Portfolio() {
                                                 {/* Actions */}
                                                 <td className="py-3.5 text-right">
                                                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {/* Edit */}
                                                         <button onClick={() => setEditHolding(h)}
                                                             className="p-1.5 rounded-lg transition-colors"
                                                             style={{ color: 'var(--color-text-muted)' }}
@@ -523,6 +698,15 @@ export default function Portfolio() {
                                                             onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>
                                                             <Pencil size={14} />
                                                         </button>
+                                                        {/* Sell */}
+                                                        <button onClick={() => setSellTarget(h)}
+                                                            className="p-1.5 rounded-lg transition-colors"
+                                                            style={{ color: 'var(--color-text-muted)' }}
+                                                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-warning)')}
+                                                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>
+                                                            <DollarSign size={14} />
+                                                        </button>
+                                                        {/* Delete */}
                                                         <button onClick={() => setDeleteTarget(h)}
                                                             className="p-1.5 rounded-lg transition-colors"
                                                             style={{ color: 'var(--color-text-muted)' }}
@@ -610,7 +794,7 @@ export default function Portfolio() {
                     <GlassCard>
                         <h2 className="text-h3 mb-4 flex items-center gap-2">
                             <div className="flex items-center gap-1 text-xs">
-                                {["1W","1M","3M","1Y","ALL"].map(r => (
+                                {["1W", "1M", "3M", "1Y", "ALL"].map(r => (
                                     <button
                                         key={r}
                                         onClick={() => setRange(r as any)}
@@ -658,6 +842,37 @@ export default function Portfolio() {
                     />
                 )}
             </AnimatePresence>
+
+            <AnimatePresence>
+                {sellTarget && (
+                    <SellModal
+                        holding={sellTarget}
+                        onClose={() => setSellTarget(null)}
+                        onSell={handleSell}
+                    />
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showDeposit && (
+                    <WalletModal
+                        title="Deposit Funds"
+                        onConfirm={deposit}
+                        onClose={() => setShowDeposit(false)}
+                    />
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showWithdraw && (
+                    <WalletModal
+                        title="Withdraw Funds"
+                        onConfirm={withdraw}
+                        onClose={() => setShowWithdraw(false)}
+                    />
+                )}
+            </AnimatePresence>
+
         </motion.div>
     );
 }

@@ -9,6 +9,20 @@ function clamp(val: number, min = 1, max = 10): number {
     return Math.min(max, Math.max(min, val));
 }
 
+function norm(score: number) {
+    return clamp(score, 0, 100) / 100;
+}
+
+/**
+ * Smooth penalty curve (more natural than linear thresholds)
+ */
+function smoothPenalty(score: number, threshold: number, maxImpact: number) {
+    if (score <= threshold) return 0;
+
+    const x = (score - threshold) / (100 - threshold);
+    return maxImpact * (1 - Math.exp(-3 * x));
+}
+
 export interface AdaptiveRiskResult {
     currentRiskTolerance: number;
     suggestedRiskTolerance: number;
@@ -26,23 +40,54 @@ export interface AdaptiveRiskResult {
 }
 
 export async function computeAdaptiveRisk(userId: number): Promise<AdaptiveRiskResult> {
-    // --- Load data in parallel ------------------------------------------------
-    const [lastOptRun, lastBehavioral, recentReturns, ltReturns, transactionCount, lastSpending] = await Promise.all([
-        prisma.optimizationRun.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-        prisma.behavioralScore.findFirst({ where: { userId }, orderBy: { updatedAt: 'desc' } }),
-        prisma.portfolioReturn.findMany({ where: { userId }, orderBy: { returnDate: 'desc' }, take: 21 }),
-        prisma.portfolioReturn.findMany({ where: { userId }, orderBy: { returnDate: 'desc' }, take: 252 }),
-        prisma.transaction.count({ where: { userId } }),
-        prisma.spendingMetric.findFirst({ where: { userId }, orderBy: { calculatedAt: 'desc' } }),
+
+    const [
+        lastOptRun,
+        lastBehavioral,
+        recentReturns,
+        ltReturns,
+        tradeCount
+    ] = await Promise.all([
+
+        prisma.optimizationRun.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'desc' }
+        }),
+
+        prisma.behavioralScore.findFirst({
+            where: { userId },
+            orderBy: { updatedAt: 'desc' }
+        }),
+
+        prisma.portfolioReturn.findMany({
+            where: { userId },
+            orderBy: { returnDate: 'desc' },
+            take: 21
+        }),
+
+        prisma.portfolioReturn.findMany({
+            where: { userId },
+            orderBy: { returnDate: 'desc' },
+            take: 252
+        }),
+
+        prisma.rebalancingAction.count({
+            where: { userId }
+        })
+
     ]);
 
-    // --- Current risk tolerance (scale: 1-10) ----------------------------------
-    // UserProfile stores riskTolerance as 0-1; OptimizationRun may store it differently
-    const rawTolerance = lastOptRun?.riskTolerance ? n(lastOptRun.riskTolerance) : 0.5;
-    // Normalise to 1-10 scale: if value is in 0-1 range, multiply by 10
-    const currentRiskTolerance = rawTolerance <= 1 ? parseFloat((rawTolerance * 10).toFixed(1)) : parseFloat(rawTolerance.toFixed(1));
+    /* ───────── CURRENT RISK TOLERANCE ───────── */
 
-    // --- Behavioral scores (defaults if not available) -------------------------
+    const rawTolerance = lastOptRun?.riskTolerance ? n(lastOptRun.riskTolerance) : 0.5;
+
+    const currentRiskTolerance =
+        rawTolerance <= 1
+            ? parseFloat((rawTolerance * 10).toFixed(1))
+            : parseFloat(rawTolerance.toFixed(1));
+
+    /* ───────── BEHAVIORAL SCORES ───────── */
+
     const bScores = {
         adaptiveRiskScore: lastBehavioral ? n(lastBehavioral.adaptiveRiskScore) : 50,
         panicSellScore: lastBehavioral ? n(lastBehavioral.panicSellScore) : 50,
@@ -51,93 +96,144 @@ export async function computeAdaptiveRisk(userId: number): Promise<AdaptiveRiskR
         liquidityStressScore: lastBehavioral ? n(lastBehavioral.liquidityStressScore) : 50,
     };
 
-    // --- Market regime --------------------------------------------------------
+    /* ───────── MARKET REGIME DETECTION ───────── */
+
     let marketRegime: 'LOW_VOLATILITY' | 'NORMAL' | 'HIGH_VOLATILITY' = 'NORMAL';
+
     let recentVolatility = 0;
     let ltVolatility = 0;
 
     if (recentReturns.length >= 5) {
+
         const rets = recentReturns.map(r => n(r.dailyReturn));
         const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
-        const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / (rets.length-1);
+
+        const variance =
+            rets.reduce((s, r) => s + (r - mean) ** 2, 0) / (rets.length - 1);
+
         recentVolatility = Math.sqrt(variance * 252);
     }
+
     if (ltReturns.length >= 20) {
+
         const rets = ltReturns.map(r => n(r.dailyReturn));
         const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
-        const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / rets.length;
+
+        const variance =
+            rets.reduce((s, r) => s + (r - mean) ** 2, 0) / rets.length;
+
         ltVolatility = Math.sqrt(variance * 252);
     }
 
-    if (ltVolatility > 0) {
-        const ratio = recentVolatility / ltVolatility;
-        if (ratio > 1.5) marketRegime = 'HIGH_VOLATILITY';
-        else if (ratio < 0.6) marketRegime = 'LOW_VOLATILITY';
-    } else if (recentVolatility > 0.25) {
-        marketRegime = 'HIGH_VOLATILITY';
-    } else if (recentVolatility < 0.08) {
-        marketRegime = 'LOW_VOLATILITY';
-    }
+    const volRatio =
+        ltVolatility > 0 ? recentVolatility / ltVolatility : 1;
 
-    // --- Adjustment logic ─────────────────────────────────────────────────────
-    let suggestedTolerance = clamp(currentRiskTolerance, 1, 10);
+    if (volRatio > 1.5) marketRegime = 'HIGH_VOLATILITY';
+    else if (volRatio < 0.6) marketRegime = 'LOW_VOLATILITY';
+
+    /* ───────── BEHAVIOR PRESSURE MODEL ───────── */
+
+    const behaviorPressure =
+        norm(bScores.panicSellScore) * 0.35 +
+        norm(bScores.recencyBiasScore) * 0.2 +
+        norm(bScores.riskChasingScore) * 0.25 -
+        norm(bScores.adaptiveRiskScore) * 0.3 -
+        norm(100 - bScores.liquidityStressScore) * 0.1;
+
+    let suggestedTolerance = currentRiskTolerance;
+
     const adjustmentReasons: string[] = [];
 
-    // High panic sell → reduce risk
-    if (bScores.panicSellScore > 60) {
-        const reduction = parseFloat(((bScores.panicSellScore - 60) / 40 * 2).toFixed(1));
-        suggestedTolerance -= reduction;
-        adjustmentReasons.push(`Reduced by ${reduction} due to elevated panic sell tendency (score: ${bScores.panicSellScore.toFixed(0)})`);
+    /* ───────── BEHAVIORAL ADJUSTMENT ───────── */
+
+    const panicPenalty = smoothPenalty(bScores.panicSellScore, 60, 2);
+    const recencyPenalty = smoothPenalty(bScores.recencyBiasScore, 55, 1);
+    const chasingPenalty = smoothPenalty(bScores.riskChasingScore, 60, 1.5);
+
+    const stabilityBoost = smoothPenalty(bScores.adaptiveRiskScore, 70, 1);
+    const liquidityBoost =
+        bScores.liquidityStressScore < 40
+            ? ((40 - bScores.liquidityStressScore) / 40) * 0.8
+            : 0;
+
+    suggestedTolerance -= panicPenalty;
+    suggestedTolerance -= recencyPenalty;
+    suggestedTolerance -= chasingPenalty;
+
+    suggestedTolerance += stabilityBoost;
+    suggestedTolerance += liquidityBoost;
+
+    if (panicPenalty > 0)
+        adjustmentReasons.push(`Panic-selling tendency detected`);
+
+    if (recencyPenalty > 0)
+        adjustmentReasons.push(`Recency bias affecting decisions`);
+
+    if (chasingPenalty > 0)
+        adjustmentReasons.push(`Volatility chasing behavior`);
+
+    if (stabilityBoost > 0)
+        adjustmentReasons.push(`Behavioral stability allows slightly higher risk`);
+
+    if (liquidityBoost > 0)
+        adjustmentReasons.push(`Strong liquidity buffer supports risk capacity`);
+
+    /* ───────── INTERACTION EFFECTS ───────── */
+
+    if (
+        bScores.panicSellScore > 65 &&
+        bScores.recencyBiasScore > 65
+    ) {
+        suggestedTolerance -= 0.5;
+
+        adjustmentReasons.push(
+            'Combined panic selling and recency bias increase risk sensitivity'
+        );
     }
 
-    // High recency bias → reduce a bit
-    if (bScores.recencyBiasScore > 55) {
-        const reduction = parseFloat(((bScores.recencyBiasScore - 55) / 45 * 1).toFixed(1));
-        suggestedTolerance -= reduction;
-        adjustmentReasons.push(`Reduced by ${reduction} due to recency bias (score: ${bScores.recencyBiasScore.toFixed(0)})`);
+    /* ───────── VOLATILITY ADJUSTMENT ───────── */
+
+    if (volRatio > 1) {
+
+        const volPenalty = Math.min(1.2, (volRatio - 1) * 1.2);
+
+        suggestedTolerance -= volPenalty;
+
+        adjustmentReasons.push(
+            `Elevated market volatility (ratio ${volRatio.toFixed(2)})`
+        );
     }
 
-    // High risk chasing → reduce
-    if (bScores.riskChasingScore > 60) {
-        const reduction = parseFloat(((bScores.riskChasingScore - 60) / 40 * 1.5).toFixed(1));
-        suggestedTolerance -= reduction;
-        adjustmentReasons.push(`Reduced by ${reduction} due to risk chasing behavior (score: ${bScores.riskChasingScore.toFixed(0)})`);
-    }
+    /* ───────── INERTIA (RISK SHOULD DRIFT) ───────── */
 
-    // Good liquidity (low stress) → allow slightly higher risk
-    if (bScores.liquidityStressScore < 30) {
-        const increase = parseFloat(((30 - bScores.liquidityStressScore) / 30 * 1).toFixed(1));
-        suggestedTolerance += increase;
-        adjustmentReasons.push(`Increased by ${increase} due to strong liquidity buffer (stress score: ${bScores.liquidityStressScore.toFixed(0)})`);
-    }
+    const inertia = 0.65;
 
-    // High adaptive risk score → small boost
-    if (bScores.adaptiveRiskScore > 70) {
-        const increase = parseFloat(((bScores.adaptiveRiskScore - 70) / 30 * 1).toFixed(1));
-        suggestedTolerance += increase;
-        adjustmentReasons.push(`Increased by ${increase} due to strong adaptive risk behaviour (score: ${bScores.adaptiveRiskScore.toFixed(0)})`);
-    }
+    suggestedTolerance =
+        currentRiskTolerance +
+        (suggestedTolerance - currentRiskTolerance) * (1 - inertia);
 
-    // High volatility regime → reduce further
-    if (marketRegime === 'HIGH_VOLATILITY') {
-        const reduction = 0.75;
-        suggestedTolerance -= reduction;
-        adjustmentReasons.push(`Reduced by ${reduction} due to high-volatility market conditions`);
-    }
+    suggestedTolerance = parseFloat(
+        clamp(suggestedTolerance, 1, 10).toFixed(1)
+    );
+
+    const adjustmentDelta = parseFloat(
+        (suggestedTolerance - currentRiskTolerance).toFixed(1)
+    );
 
     if (adjustmentReasons.length === 0) {
-        adjustmentReasons.push('No significant adjustment needed; your behavioral profile aligns with your current risk tolerance.');
+        adjustmentReasons.push(
+            'Behavioral profile consistent with current risk level'
+        );
     }
 
-    suggestedTolerance = parseFloat(clamp(suggestedTolerance, 1, 10).toFixed(1));
-    const adjustmentDelta = parseFloat((suggestedTolerance - currentRiskTolerance).toFixed(1));
+    /* ───────── CONFIDENCE MODEL ───────── */
 
-    // --- Confidence level ------------------------------------------------------
-    let confidence = 0.4; // base
-    if (lastBehavioral) confidence += 0.2;
-    if (ltReturns.length >= 60) confidence += 0.2;
-    if (transactionCount >= 20) confidence += 0.15;
-    if (lastSpending) confidence += 0.05;
+    let confidence =
+        0.35 +
+        Math.min(0.2, ltReturns.length / 300) +
+        Math.min(0.2, tradeCount / 50) +
+        (lastBehavioral ? 0.15 : 0);
+
     confidence = parseFloat(Math.min(0.95, confidence).toFixed(2));
 
     return {

@@ -125,6 +125,103 @@ portfolioController.delete('/holdings/:id', asyncHandler(async (req: Request, re
     return sendSuccess(res, result);
 }));
 
+// GET /portfolio/wallet
+portfolioController.get('/wallet', asyncHandler(async (req, res) => {
+  const userId = (req as AuthRequest).user.userId;
+  const result = await portfolioService.getWallet(userId);
+  sendSuccess(res, result);
+}));
+
+// GET /portfolio/trades
+portfolioController.get('/trades', asyncHandler(async (req, res) => {
+  const userId = (req as AuthRequest).user.userId;
+  const limit = Number(req.query.limit ?? 10);
+  const result = await portfolioService.getTrades(userId, limit);
+  sendSuccess(res, result);
+}));
+
+// ═══════════════════════════════════════════════════════
+// WALLET ACTIONS
+// ═══════════════════════════════════════════════════════
+
+// POST /portfolio/wallet/deposit
+portfolioController.post('/wallet/deposit', asyncHandler(async (req, res) => {
+
+  const userId = (req as AuthRequest).user.userId;
+  const { amount } = req.body;
+
+  if (!amount || amount <= 0) {
+    throw new BadRequestError("Deposit amount must be > 0");
+  }
+
+  const wallet = await portfolioService.deposit(userId, Number(amount));
+
+  sendSuccess(res, wallet);
+
+}));
+
+// POST /portfolio/wallet/withdraw
+portfolioController.post('/wallet/withdraw', asyncHandler(async (req, res) => {
+
+  const userId = (req as AuthRequest).user.userId;
+  const { amount } = req.body;
+
+  if (!amount || amount <= 0) {
+    throw new BadRequestError("Withdraw amount must be > 0");
+  }
+
+  const wallet = await portfolioService.withdraw(userId, Number(amount));
+
+  sendSuccess(res, wallet);
+
+}));
+
+// ═══════════════════════════════════════════════════════
+// TRADE EXECUTION
+// ═══════════════════════════════════════════════════════
+
+// POST /portfolio/trades/buy
+portfolioController.post('/trades/buy', asyncHandler(async (req, res) => {
+
+  const userId = (req as AuthRequest).user.userId;
+
+  const { ticker, quantity, price } = req.body;
+
+  if (!ticker || !quantity || !price) {
+    throw new BadRequestError("ticker, quantity and price are required");
+  }
+
+  const result = await portfolioService.executeBuy(userId, {
+    ticker,
+    quantity: Number(quantity),
+    price: Number(price)
+  });
+
+  sendSuccess(res, result);
+
+}));
+
+// POST /portfolio/trades/sell
+portfolioController.post('/trades/sell', asyncHandler(async (req, res) => {
+
+  const userId = (req as AuthRequest).user.userId;
+
+  const { holdingId, quantity, price } = req.body;
+
+  if (!holdingId || !quantity || !price) {
+    throw new BadRequestError("holdingId, quantity and price are required");
+  }
+
+  const result = await portfolioService.executeSell(userId, {
+    holdingId: Number(holdingId),
+    quantity: Number(quantity),
+    price: Number(price)
+  });
+
+  sendSuccess(res, result);
+
+}));
+
 // ═══════════════════════════════════════════════════════
 // SEED (for onboarding — creates demo holdings per user)
 // ═══════════════════════════════════════════════════════

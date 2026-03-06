@@ -1,9 +1,7 @@
 import api from './api';
-import { isDemoMode, sleep } from '../utils';
-import { demoBehavioralScore, demoSpendingMetrics, demoBehavioralHistory } from '../utils/demoData';
-import type { BehavioralScore, SpendingMetrics } from '../types';
 
-// ── Raw response types from backend ─────────────────────────────────────────
+/* ───────────────── TYPES ───────────────── */
+
 export interface BiasScores {
     adaptiveRiskScore: number;
     panicSellScore: number;
@@ -14,17 +12,6 @@ export interface BiasScores {
     featureSnapshot: Record<string, number>;
     insights: string[];
     updatedAt: string;
-    fromCache?: boolean;
-}
-
-export interface SpendingAnalysis {
-    monthlyBurnRate: number;
-    savingsRate: number;
-    expenseVolatility: number;
-    categoryBreakdown: { category: string; amount: number; percentage: number }[];
-    monthlyTrend: { month: string; income: number; expenses: number; savings: number }[];
-    anomalies: { month: string; amount: number; deviation: number }[];
-    calculatedAt: string;
 }
 
 export interface AdaptiveRiskData {
@@ -34,13 +21,6 @@ export interface AdaptiveRiskData {
     confidence: number;
     marketRegime: 'LOW_VOLATILITY' | 'NORMAL' | 'HIGH_VOLATILITY';
     adjustmentReasons: string[];
-    behavioralScores: {
-        adaptiveRiskScore: number;
-        panicSellScore: number;
-        recencyBiasScore: number;
-        riskChasingScore: number;
-        liquidityStressScore: number;
-    };
 }
 
 export interface ScoreHistoryItem {
@@ -52,61 +32,51 @@ export interface ScoreHistoryItem {
     updatedAt: string;
 }
 
-export interface TransactionInput {
-    amount: number;
-    category?: string;
-    transactionType: 'income' | 'expense' | 'investment' | 'withdrawal';
-    description?: string;
-    transactionDate: string; // YYYY-MM-DD
+export interface WalletData {
+    balance: number;
 }
 
-export const behavioralService = {
-    // ── New endpoints ────────────────────────────────────────────────────────
-    getScores: async (): Promise<BiasScores> => {
-        const { data } = await api.get<BiasScores>('/behavioral/scores');
-        return data;
-    },
+export interface TradeItem {
+    id: number;
+    assetTicker: string;
+    side: 'BUY' | 'SELL';
+    quantity: number;
+    price: number;
+    total: number;
+    createdAt: string;
+}
 
-    getSpending: async (months = 6): Promise<SpendingAnalysis> => {
-        const { data } = await api.get<SpendingAnalysis>(`/behavioral/spending?months=${months}`);
+/* ───────────────── SERVICE ───────────────── */
+
+export const behavioralService = {
+
+    getScores: async (): Promise<BiasScores> => {
+        const { data } = await api.get('/behavioral/scores');
         return data;
     },
 
     refreshScores: async (): Promise<BiasScores> => {
-        const { data } = await api.post<BiasScores>('/behavioral/scores/refresh');
+        const { data } = await api.post('/behavioral/scores/refresh');
         return data;
     },
 
     getAdaptiveRisk: async (): Promise<AdaptiveRiskData> => {
-        const { data } = await api.get<AdaptiveRiskData>('/behavioral/adaptive-risk');
+        const { data } = await api.get('/behavioral/adaptive-risk');
         return data;
     },
 
-    getHistory: async (limit = 10): Promise<ScoreHistoryItem[]> => {
-        const { data } = await api.get<ScoreHistoryItem[]>(`/behavioral/history?limit=${limit}`);
+    getHistory: async (limit = 20): Promise<ScoreHistoryItem[]> => {
+        const { data } = await api.get(`/behavioral/history?limit=${limit}`);
         return data;
     },
 
-    addTransaction: async (input: TransactionInput) => {
-        const { data } = await api.post('/behavioral/transactions', input);
+    getWallet: async (): Promise<WalletData> => {
+        const { data } = await api.get('/portfolio/wallet');
         return data;
     },
 
-    bulkAddTransactions: async (transactions: TransactionInput[]) => {
-        const { data } = await api.post('/behavioral/transactions/bulk', { transactions });
+    getTrades: async (limit = 10): Promise<TradeItem[]> => {
+        const { data } = await api.get(`/portfolio/trades?limit=${limit}`);
         return data;
-    },
-
-    // ── Legacy (kept for backward compat) ────────────────────────────────────
-    getScore: async (): Promise<BehavioralScore> => {
-        const { data } = await api.get<any>('/behavioral/score');
-        return {
-            adaptiveRiskScore: data.adaptiveRiskScore ?? 50,
-            panicSellingIndex: (data.panicSellScore ?? 50) / 100,
-            recencyBias: (data.recencyBiasScore ?? 50) / 100,
-            riskChasing: (data.riskChasingScore ?? 50) / 100,
-            liquidityStress: (data.liquidityStressScore ?? 50) / 100,
-            date: data.updatedAt ?? new Date().toISOString(),
-        };
     },
 };
