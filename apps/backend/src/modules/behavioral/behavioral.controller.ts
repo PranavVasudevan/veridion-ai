@@ -20,24 +20,26 @@ behavioralController.get('/scores', asyncHandler(async (req: Request, res: Respo
         orderBy: { updatedAt: 'desc' },
     });
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const oneHourAgo = new Date(Date.now() - 5 * 60 * 1000);
 
     if (cached && cached.updatedAt > oneHourAgo) {
 
         const snap = cached.featureSnapshot as Record<string, any> ?? {};
+const weights = cached.modelWeights as Record<string, any> ?? {};
 
-        return sendSuccess(res, {
-            adaptiveRiskScore: cached.adaptiveRiskScore?.toNumber() ?? 50,
-            panicSellScore: cached.panicSellScore?.toNumber() ?? 50,
-            recencyBiasScore: cached.recencyBiasScore?.toNumber() ?? 50,
-            riskChasingScore: cached.riskChasingScore?.toNumber() ?? 50,
-            liquidityStressScore: cached.liquidityStressScore?.toNumber() ?? 50,
-            lossAversionRatio: snap.lossAversionRatio ?? null,
-            featureSnapshot: snap,
-            insights: (cached.modelWeights as any)?.insights ?? [],
-            updatedAt: cached.updatedAt.toISOString(),
-            fromCache: true,
-        });
+return sendSuccess(res, {
+    adaptiveRiskScore: cached.adaptiveRiskScore?.toNumber() ?? 0,
+    panicSellScore: cached.panicSellScore?.toNumber() ?? 0,
+    recencyBiasScore: cached.recencyBiasScore?.toNumber() ?? 0,
+    riskChasingScore: cached.riskChasingScore?.toNumber() ?? 0,
+    liquidityStressScore: cached.liquidityStressScore?.toNumber() ?? 0,
+    lossAversionRatio: snap.lossAversionRatio ?? null,
+    featureSnapshot: snap,
+    insights: weights.insights ?? [],
+    alerts: weights.alerts ?? [],
+    updatedAt: cached.updatedAt.toISOString(),
+    fromCache: true,
+});
     }
 
     const result = await detectBiases(userId);
@@ -85,11 +87,11 @@ behavioralController.get('/history', asyncHandler(async (req: Request, res: Resp
 
     return sendSuccess(res,
         rows.map(r => ({
-            adaptiveRiskScore: r.adaptiveRiskScore?.toNumber() ?? 50,
-            panicSellScore: r.panicSellScore?.toNumber() ?? 50,
-            recencyBiasScore: r.recencyBiasScore?.toNumber() ?? 50,
-            riskChasingScore: r.riskChasingScore?.toNumber() ?? 50,
-            liquidityStressScore: r.liquidityStressScore?.toNumber() ?? 50,
+            adaptiveRiskScore: r.adaptiveRiskScore?.toNumber() ?? null,
+            panicSellScore: r.panicSellScore?.toNumber() ?? null,
+            recencyBiasScore: r.recencyBiasScore?.toNumber() ?? null,
+            riskChasingScore: r.riskChasingScore?.toNumber() ?? null,
+            liquidityStressScore: r.liquidityStressScore?.toNumber() ?? null,
             updatedAt: r.updatedAt.toISOString(),
         })).reverse()
     );

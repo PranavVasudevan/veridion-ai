@@ -1,3 +1,4 @@
+console.log('useBehavioral called');
 import { motion } from 'framer-motion';
 import {
     Brain,
@@ -33,13 +34,13 @@ const pageV = {
     exit: { opacity: 0 },
 };
 
-function scoreColor(val: number) {
+function scoreColor(val: number): React.CSSProperties['color'] {
     if (val >= 70) return 'var(--color-success)';
     if (val >= 40) return 'var(--color-warning)';
     return 'var(--color-danger)';
 }
 
-function riskColor(val: number) {
+function riskColor(val: number): React.CSSProperties['color'] {
     if (val <= 30) return 'var(--color-success)';
     if (val <= 60) return 'var(--color-warning)';
     return 'var(--color-danger)';
@@ -121,8 +122,13 @@ function classifyInsight(text: string): 'good' | 'warn' | 'bad' {
 
 export default function BehavioralInsights() {
 
-    const { scores, adaptiveRisk, history, wallet, trades, isLoading } = useBehavioral();
+
+    const { scores, adaptiveRisk, history = [], wallet, trades = [], isLoading } = useBehavioral();
     const { isRefreshing, refreshScores } = useBehavioralStore();
+    console.log('scores in component:', scores);
+    const adaptiveScore = scores?.adaptiveRiskScore ?? 0;
+    const alerts = scores?.alerts ?? [];
+const insights = scores?.insights ?? [];
 
     const radarData = scores ? [
         { name: 'Adaptive', value: Math.round(scores.adaptiveRiskScore) },
@@ -144,7 +150,8 @@ export default function BehavioralInsights() {
         HIGH_VOLATILITY: { color: 'var(--color-danger)', label: 'High Volatility' },
     };
 
-    const regime = regimeConfig[adaptiveRisk?.marketRegime ?? 'NORMAL'];
+    const regimeKey = adaptiveRisk?.marketRegime ?? 'NORMAL';
+const regime = regimeConfig[regimeKey as keyof typeof regimeConfig];;
 
     return (
         <motion.div variants={pageV} initial="initial" animate="animate" exit="exit" className="space-y-6">
@@ -174,6 +181,43 @@ export default function BehavioralInsights() {
                 </button>
 
             </div>
+            {/* Behavioral Risk Alerts */}
+
+{scores && scores.alerts.length > 0 && (
+
+<GlassCard>
+
+<h2 className="text-h3 mb-4 flex items-center gap-2">
+<AlertTriangle size={18} style={{ color: 'var(--color-danger)' }} />
+Behavioral Risk Alerts
+</h2>
+
+<div className="space-y-2">
+
+{scores?.alerts?.map((a, i) => (
+
+<div
+key={i}
+className="flex items-center gap-3 p-3 rounded-xl"
+style={{
+background: 'rgba(255,80,80,0.08)',
+borderLeft: '3px solid var(--color-danger)'
+}}
+>
+
+<AlertTriangle size={14} style={{ color: 'var(--color-danger)' }} />
+
+<p className="text-sm">{a}</p>
+
+</div>
+
+))}
+
+</div>
+
+</GlassCard>
+
+)}
 
             {/* Wallet Overview */}
 
@@ -221,21 +265,22 @@ export default function BehavioralInsights() {
 
                         {isLoading ? (
 
-                            <SkeletonLoader height="h-32" className="w-32 rounded-full" />
+<SkeletonLoader height="h-32" className="w-32 rounded-full" />
 
-                        ) : (
+) : (
 
-                            <>
-                                <AnimatedGauge value={scores?.adaptiveRiskScore ?? 0} size={130} strokeWidth={12} />
+<>
+<AnimatedGauge value={adaptiveScore} size={130} strokeWidth={12} />
 
-                                <CountUp
-                                    end={scores?.adaptiveRiskScore ?? 0}
-                                    className="text-3xl font-bold font-numeric"
-                                    style={{ color: scoreColor(scores?.adaptiveRiskScore ?? 0) }}
-                                />
-                            </>
+<span style={{ color: scoreColor(adaptiveScore) }}>
+  <CountUp
+    end={adaptiveScore}
+    className="text-3xl font-bold font-numeric"
+  />
+</span>
+</>
 
-                        )}
+)}
 
                     </GlassCard>
 
@@ -288,7 +333,14 @@ export default function BehavioralInsights() {
 
                     {isLoading
                         ? <SkeletonLoader height="h-64" />
-                        : <Diagrams data={radarData} type="radar" dataKeys={['value']} xKey="name" height={280} />
+                        : <Diagrams
+  key={scores?.calculatedAt ?? scores?.updatedAt}
+  data={radarData}
+  type="radar"
+  dataKeys={['value']}
+  xKey="name"
+  height={280}
+/>
                     }
 
                 </GlassCard>
@@ -380,26 +432,27 @@ export default function BehavioralInsights() {
 
             {/* Score Evolution */}
 
-            {history.length > 1 && (
+{history.length > 0 && (
 
-                <GlassCard>
+<GlassCard>
 
-                    <h2 className="text-h3 mb-4 flex items-center gap-2">
-                        <TrendingUp size={18} style={{ color: 'var(--color-accent-teal)' }} />
-                        Score Evolution
-                    </h2>
+<h2 className="text-h3 mb-4 flex items-center gap-2">
+<TrendingUp size={18} style={{ color: 'var(--color-accent-teal)' }} />
+Score Evolution
+</h2>
 
-                    <Diagrams
-                        data={historyChartData}
-                        type="area"
-                        dataKeys={['Adaptive', 'Panic']}
-                        xKey="date"
-                        height={220}
-                    />
+<Diagrams
+  key={history.length}
+  data={historyChartData}
+  type="area"
+  dataKeys={['Adaptive', 'Panic']}
+  xKey="date"
+  height={220}
+/>
 
-                </GlassCard>
+</GlassCard>
 
-            )}
+)}
 
         </motion.div>
     );

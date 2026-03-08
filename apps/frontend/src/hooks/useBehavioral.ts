@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useBehavioralStore } from "../state/behavioral.store";
-
 export function useBehavioral() {
 
   const {
@@ -14,6 +13,7 @@ export function useBehavioral() {
   } = useBehavioralStore();
 
   useEffect(() => {
+    console.log('fetchAll firing');
     fetchAll();
   }, [fetchAll]);
 

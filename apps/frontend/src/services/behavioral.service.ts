@@ -11,7 +11,10 @@ export interface BiasScores {
     lossAversionRatio: number | null;
     featureSnapshot: Record<string, number>;
     insights: string[];
-    updatedAt: string;
+    alerts: string[];
+    calculatedAt?: string;
+    updatedAt?: string;
+    fromCache?: boolean;
 }
 
 export interface AdaptiveRiskData {
@@ -52,31 +55,32 @@ export const behavioralService = {
 
     getScores: async (): Promise<BiasScores> => {
         const { data } = await api.get('/behavioral/scores');
-        return data;
+        console.log('raw scores response:', data);
+        return data.data ?? data;
     },
 
     refreshScores: async (): Promise<BiasScores> => {
         const { data } = await api.post('/behavioral/scores/refresh');
-        return data;
+        return data.data ?? data;
     },
 
     getAdaptiveRisk: async (): Promise<AdaptiveRiskData> => {
         const { data } = await api.get('/behavioral/adaptive-risk');
-        return data;
+        return data.data ?? data;
     },
 
     getHistory: async (limit = 20): Promise<ScoreHistoryItem[]> => {
         const { data } = await api.get(`/behavioral/history?limit=${limit}`);
-        return data;
+        return data.data ?? data;
     },
 
     getWallet: async (): Promise<WalletData> => {
         const { data } = await api.get('/portfolio/wallet');
-        return data;
+        return data.data ?? data;
     },
 
     getTrades: async (limit = 10): Promise<TradeItem[]> => {
         const { data } = await api.get(`/portfolio/trades?limit=${limit}`);
-        return data;
+        return data.data ?? data;
     },
 };

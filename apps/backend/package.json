@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.0",
+    "@prisma/client": "^6.19.2",
     "axios": "^1.x.x",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
@@ -28,6 +28,7 @@
     "node-cron": "^4.2.1",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
+    "prisma": "^6.19.2",
     "redis": "^4.7.0",
     "yahoo-finance2": "^3.13.2"
   },
@@ -38,7 +39,6 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.10.0",
     "@types/node-cron": "^3.0.11",
-    "prisma": "^6.2.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
