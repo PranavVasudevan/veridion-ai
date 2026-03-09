@@ -36,7 +36,6 @@ const NAV_GROUPS = [
         label: 'ACTIVITY',
         items: [
             { id: 'alerts', label: 'Alerts', icon: 'Bell', path: '/alerts' },
-            { id: 'audit', label: 'Audit Log', icon: 'FileText', path: '/audit' },
         ],
     },
 ];

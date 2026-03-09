@@ -74,6 +74,7 @@ export interface DashboardSummary {
         id: number;
         type: string;
         severity: string;
+        title: string;
         message: string;
         isRead: boolean;
         createdAt: string;

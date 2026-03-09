@@ -176,82 +176,7 @@ export default function Profile() {
                 </div>
             </GlassCard>
 
-            {/* Investment Preferences */}
-            <GlassCard className="mb-6">
-                <h3 className="text-h3 mb-4 flex items-center gap-2">
-                    <Target size={18} style={{ color: 'var(--color-accent-teal)' }} /> Investment Preferences
-                </h3>
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-caption block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Investment Goal</label>
-                        {isEditing ? (
-                            <div className="flex flex-wrap gap-1.5">
-                                {GOALS.map((g) => (
-                                    <button key={g} type="button" onClick={() => update('investmentGoal', g)}
-                                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
-                                        style={{
-                                            background: form.investmentGoal === g ? 'var(--color-accent-teal)' : 'var(--color-bg-tertiary)',
-                                            color: form.investmentGoal === g ? 'var(--color-bg-primary)' : 'var(--color-text-secondary)',
-                                        }}>
-                                        {g}
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-sm font-semibold capitalize">{profile?.profile?.investmentGoal || '—'}</p>
-                        )}
-                    </div>
-                    <div>
-                        <label className="text-caption block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                            Risk Tolerance — {riskLabel(form.riskTolerance ?? 0.5)}
-                        </label>
-                        {isEditing ? (
-                            <div className="flex items-center gap-3">
-                                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Low</span>
-                                <input type="range" min="0" max="1" step="0.05" value={form.riskTolerance ?? 0.5}
-                                    onChange={(e) => update('riskTolerance', parseFloat(e.target.value))}
-                                    className="flex-1" style={{ accentColor: 'var(--color-accent-teal)' }} />
-                                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>High</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-tertiary)' }}>
-                                    <div className="h-full rounded-full" style={{ width: `${(profile?.profile?.riskTolerance ?? 0.5) * 100}%`, background: 'var(--gradient-accent)' }} />
-                                </div>
-                                <span className="text-xs font-numeric font-medium">{Math.round((profile?.profile?.riskTolerance ?? 0.5) * 100)}%</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-caption block mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                                <Clock size={12} className="inline mr-1" /> Investment Horizon (years)
-                            </label>
-                            {isEditing ? (
-                                <input className="input-field" type="number" min="1" max="50" value={form.investmentHorizon || ''} onChange={(e) => update('investmentHorizon', parseInt(e.target.value) || 10)} />
-                            ) : (
-                                <p className="text-sm font-semibold">{profile?.profile?.investmentHorizon ?? 10} years</p>
-                            )}
-                        </div>
-                        <div>
-                            <label className="text-caption block mb-1" style={{ color: 'var(--color-text-muted)' }}>Role</label>
-                            <p className="text-sm font-semibold">{profile?.role || user?.role || 'Investor'}</p>
-                        </div>
-                    </div>
-                </div>
-            </GlassCard>
 
-            {/* KYC Status */}
-            <GlassCard className="mb-6">
-                <h3 className="text-h3 mb-4">Verification Status</h3>
-                <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
-                    <CheckCircle size={20} style={{ color: 'var(--color-success)' }} />
-                    <div>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--color-success)' }}>Verified</p>
-                        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>KYC completed on Jan 15, 2025</p>
-                    </div>
-                </div>
-            </GlassCard>
 
             {/* Retake Questionnaire */}
             <GlassCard className="mb-6">
@@ -266,13 +191,6 @@ export default function Profile() {
                 </button>
             </GlassCard>
 
-            {/* Data Export */}
-            <GlassCard className="mb-6">
-                <h3 className="text-h3 mb-4">Data Management</h3>
-                <button className="btn-secondary w-full">
-                    <Download size={16} /> Export My Data
-                </button>
-            </GlassCard>
 
             {/* Danger Zone */}
             <GlassCard>

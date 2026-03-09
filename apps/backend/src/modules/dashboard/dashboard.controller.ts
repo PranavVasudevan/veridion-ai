@@ -21,7 +21,7 @@ dashboardController.get('/summary', asyncHandler(async (req: Request, res: Respo
 
     const [
         user, holdings, latestRisk, behavioralScore,
-        portfolioState, snapshots, alerts, goals, monteCarloResults, events,
+        portfolioState, snapshots, alerts, goals, monteCarloResults, events, wallet,
     ] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, include: { profile: true } }),
         prisma.holding.findMany({
@@ -36,12 +36,12 @@ dashboardController.get('/summary', asyncHandler(async (req: Request, res: Respo
         prisma.financialGoal.findMany({ where: { userId }, orderBy: { priority: 'asc' }, take: 3 }),
         prisma.monteCarloResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 3 }),
         prisma.newsEvent.findMany({ orderBy: { id: 'desc' }, take: 5 }),
+        prisma.wallet.findUnique({ where: { userId } }),
     ]);
 
     // Portfolio value calculation — now includes P&L, change24h, avgCost
     let totalValue = 0;
     let totalCost = 0;
-    let cashBalance = 0;
 
     const holdingsSummary = holdings.map(h => {
         const prices = h.asset.prices;
@@ -54,9 +54,7 @@ dashboardController.get('/summary', asyncHandler(async (req: Request, res: Respo
         totalValue += marketValue;
         totalCost += qty * avg;
 
-        // Track cash-type holdings
-        const assetType = (h.asset.assetType ?? '').toUpperCase();
-        if (assetType === 'CASH') cashBalance += marketValue;
+
 
         const unrealizedPnL = avg > 0 ? (latestPrice - avg) * qty : 0;
         const unrealizedPnLPercent = avg > 0 ? ((latestPrice - avg) / avg) * 100 : 0;
@@ -89,7 +87,8 @@ dashboardController.get('/summary', asyncHandler(async (req: Request, res: Respo
 
     // Risk profile from questionnaire
     const profile = user?.profile;
-    const riskToleranceRaw = profile?.riskTolerance ? num(profile.riskTolerance) : 50;
+    // riskTolerance is stored as 0-1 decimal from onboarding; convert to 0-100 for display
+    const riskToleranceRaw = profile?.riskTolerance ? Math.round(num(profile.riskTolerance) * 100) : 50;
     const riskProfile: 'Conservative' | 'Moderate' | 'Aggressive' =
         riskToleranceRaw <= 33 ? 'Conservative' : riskToleranceRaw <= 66 ? 'Moderate' : 'Aggressive';
 
@@ -122,7 +121,23 @@ dashboardController.get('/summary', asyncHandler(async (req: Request, res: Respo
         };
     });
 
-    const alertsSummary = alerts.map(a => ({ id: a.id, type: a.alertType, severity: a.severity, message: a.message, isRead: a.isRead, createdAt: a.createdAt.toISOString() }));
+    const alertsSummary = alerts.map(a => {
+        let parsed: Record<string, any> = {};
+        try {
+            if (a.message?.startsWith('{')) {
+                parsed = JSON.parse(a.message);
+            }
+        } catch { }
+        return {
+            id: a.id,
+            type: a.alertType ?? 'risk_threshold',
+            severity: a.severity,
+            title: parsed.title ?? a.message?.substring(0, 60) ?? 'Alert',
+            message: parsed.message ?? a.message ?? '',
+            isRead: a.isRead,
+            createdAt: a.createdAt.toISOString(),
+        };
+    });
     const unreadCount = alerts.filter(a => !a.isRead).length;
 
     const eventsSummary = (events).map((e: any) => {
@@ -147,7 +162,7 @@ dashboardController.get('/summary', asyncHandler(async (req: Request, res: Respo
         joinedAt: user?.createdAt.toISOString() ?? null,
         totalValue: Math.round(totalValue * 100) / 100,
         totalReturn: Math.round(totalReturn * 100) / 100,
-        cashBalance: Math.round(cashBalance * 100) / 100,
+        cashBalance: wallet?.balance ? Math.round(num(wallet.balance) * 100) / 100 : 0,
         holdingsCount: holdings.length,
         holdings: holdingsSummary.slice(0, 6),
         performanceData,

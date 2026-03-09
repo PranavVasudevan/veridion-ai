@@ -32,7 +32,6 @@ const items: CmdItem[] = [
     { id: 'nav-behavioral', label: 'Go to Behavioral Insights', icon: 'Brain', category: 'navigation', keywords: ['behavioral', 'bias', 'spending'], path: ROUTES.BEHAVIORAL },
     { id: 'nav-simulation', label: 'Go to Simulation Lab', icon: 'FlaskConical', category: 'navigation', keywords: ['simulation', 'stress', 'monte carlo'], path: ROUTES.SIMULATION },
     { id: 'nav-alerts', label: 'Go to Alerts', icon: 'Bell', category: 'navigation', keywords: ['alerts', 'notifications'], path: ROUTES.ALERTS },
-    { id: 'nav-audit', label: 'Go to Audit Log', icon: 'FileText', category: 'navigation', keywords: ['audit', 'log', 'decisions'], path: ROUTES.AUDIT },
     { id: 'nav-settings', label: 'Go to Settings', icon: 'Settings', category: 'navigation', keywords: ['settings', 'preferences', 'theme'], path: ROUTES.SETTINGS },
     { id: 'action-optimize', label: 'Run Portfolio Optimization', icon: 'Zap', category: 'action', keywords: ['optimize', 'rebalance', 'sharpe'] },
     { id: 'action-goal', label: 'Create New Goal', icon: 'Plus', category: 'action', keywords: ['create', 'new', 'goal'] },

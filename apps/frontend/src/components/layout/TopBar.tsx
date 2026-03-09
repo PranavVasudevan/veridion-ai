@@ -16,7 +16,6 @@ const pageTitles: Record<string, string> = {
     '/events': 'Event Intelligence',
     '/simulation': 'Simulation Lab',
     '/alerts': 'Alerts',
-    '/audit': 'Audit Log',
     '/profile': 'Profile',
     '/settings': 'Settings',
 };

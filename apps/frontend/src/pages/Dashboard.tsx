@@ -192,12 +192,12 @@ export default function Dashboard() {
                             value={formatCurrency(totalValue)}
                             sub={hasPortfolio ? `${data?.holdingsCount} assets` : 'No holdings yet'} />
                         <MetricCard delay={0.1} icon={totalReturn >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-                            label="Total Return" value={`${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%`}
+                            label="Portfolio Return" value={`${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%`}
                             color={totalReturn >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}
                             sub="vs. your avg cost" />
-                        <MetricCard delay={0.15} icon={<Wallet size={20} />} label="Cash Balance"
+                        <MetricCard delay={0.15} icon={<Wallet size={20} />} label="Available Cash"
                             value={formatCurrency(data?.cashBalance ?? 0)}
-                            sub="Available liquidity"
+                            sub="Wallet balance"
                             color="#3b82f6" />
                         <MetricCard delay={0.2} icon={<Activity size={20} />} label="Portfolio Health"
                             value={`${healthIndex.toFixed(0)} / 100`}
@@ -620,7 +620,11 @@ export default function Dashboard() {
                                                         <Pill label={a.severity} color={col} />
                                                         {!a.isRead && <span className="text-xs font-bold" style={{ color: col }}>New</span>}
                                                     </div>
-                                                    <p className="text-xs leading-relaxed"
+                                                    {a.title && (
+                                                        <p className="text-xs font-semibold mt-1"
+                                                            style={{ color: 'var(--color-text-primary)' }}>{a.title}</p>
+                                                    )}
+                                                    <p className="text-xs leading-relaxed mt-0.5"
                                                         style={{ color: 'var(--color-text-secondary)' }}>{a.message}</p>
                                                 </div>
                                             </div>
@@ -638,39 +642,7 @@ export default function Dashboard() {
                 </motion.div>
             </div>
 
-            {/* ─── News & Events ────────────────────────────────────────── */}
-            {((data?.events ?? []).length > 0 || isLoading) && (
-                <motion.div {...fade(0.7)}>
-                    <GlassCard>
-                        <h2 className="text-h3 mb-4 flex items-center gap-2">
-                            <Info size={18} style={{ color: 'var(--color-accent-teal)' }} />
-                            Market Events Affecting Your Portfolio
-                        </h2>
-                        {isLoading ? <SkeletonLoader count={3} /> : (
-                            <div className="space-y-3">
-                                {(data?.events ?? []).map(e => {
-                                    const sentiment = e.sentiment ?? 0;
-                                    const sentColor = sentiment > 0.2 ? '#1DB876' : sentiment < -0.2 ? '#E5484D' : '#D4922B';
-                                    const sentLabel = sentiment > 0.2 ? 'Bullish' : sentiment < -0.2 ? 'Bearish' : 'Neutral';
-                                    return (
-                                        <div key={e.id} className="flex items-start gap-3 p-3 rounded-xl"
-                                            style={{ background: 'var(--color-bg-tertiary)' }}>
-                                            <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: sentColor }} />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium leading-snug">{e.headline}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{e.source}</span>
-                                                    <Pill label={sentLabel} color={sentColor} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </GlassCard>
-                </motion.div>
-            )}
+            
         </div>
     );
 }

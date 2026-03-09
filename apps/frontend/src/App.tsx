@@ -13,7 +13,6 @@ import BehavioralInsights from './pages/BehavioralInsights';
 import EventInsights from './pages/EventInsights';
 import SimulationLab from './pages/SimulationLab';
 import Alerts from './pages/Alerts';
-import AuditLog from './pages/AuditLog';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import { ROUTES } from './utils/constants';
@@ -50,7 +49,6 @@ export default function App() {
                     <Route path={ROUTES.EVENTS} element={<EventInsights />} />
                     <Route path={ROUTES.SIMULATION} element={<SimulationLab />} />
                     <Route path={ROUTES.ALERTS} element={<Alerts />} />
-                    <Route path={ROUTES.AUDIT} element={<AuditLog />} />
                     <Route path={ROUTES.PROFILE} element={<Profile />} />
                     <Route path={ROUTES.SETTINGS} element={<Settings />} />
                 </Route>
