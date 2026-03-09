@@ -141,7 +141,15 @@ export default function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalP
 
         } catch (err: any) {
 
-            setError(err?.response?.data?.message || 'Failed to add asset');
+            const backendError = err?.response?.data;
+            
+            setError(
+                backendError?.message ||
+                backendError?.error?.message ||
+                backendError?.detail ||
+                err?.message ||
+                'Failed to add asset'
+            );
 
         } finally {
 

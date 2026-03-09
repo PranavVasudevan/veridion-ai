@@ -37,9 +37,13 @@ portfolioController.get('/snapshot', asyncHandler(async (req: Request, res: Resp
 // GET /portfolio/state — portfolio state + health
 portfolioController.get('/state', asyncHandler(async (req: Request, res: Response) => {
     const userId = (req as AuthRequest).user.userId;
-    const state = await stateMachine.getCurrentState(userId);
-    return sendSuccess(res, state);
-}));
+// compute fresh health
+    const healthIndex = await stateMachine.computeHealthIndex(userId);
+    const state = stateMachine.stateFromHealth(healthIndex);
+    const result = await stateMachine.transitionState(userId, state);
+    return sendSuccess(res, result);
+  })
+);
 
 // GET /portfolio/allocation
 portfolioController.get('/allocation', asyncHandler(async (req: Request, res: Response) => {

@@ -50,7 +50,12 @@ export default function Diagrams({
                 return (
                     <AreaChart data={data as any[]}>
                         {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />}
-                        <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false} />
+                        <XAxis 
+                            dataKey={xKey}
+                            tick={axisStyle}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(v) => new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
                         <YAxis tick={axisStyle} axisLine={false} tickLine={false} />
                         <Tooltip content={<CustomTooltipContent />} />
                         {showLegend && <Legend />}

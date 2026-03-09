@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Plus, Trash2, Pencil, Search, X, ArrowUpRight, ArrowDownRight,
+    Plus, Trash2, Pencil, Search, X, ArrowUpRight, ArrowDownRight, Wallet,
     Briefcase, DollarSign, BarChart3, Shield, Activity, PieChart as PieIcon,
     TrendingUp, Layers, AlertTriangle, ChevronDown, ChevronUp, RefreshCw,
 } from 'lucide-react';
@@ -12,7 +12,8 @@ import Diagrams from '../components/charts/Diagrams';
 import SkeletonLoader from '../components/ui/SkeletonLoader';
 import AddAssetModal, { AddAssetData } from '../components/ui/AddAssetModal';
 import { usePortfolio } from '../hooks/usePortfolio';
-import { formatCurrency, formatPercent } from '../utils/formatters';
+import { formatCurrency } from '../utils/formatters';
+import { useRiskMetrics } from '../hooks/useRiskMetrics';
 
 
 const pageV = {
@@ -287,7 +288,7 @@ function WalletModal({
                         </button>
                         <button
                             className="btn-primary flex-1"
-                            onClick={() => onConfirm(amount)}
+                            onClick={() => {onConfirm(amount); onClose();}}
                         >
                             Confirm
                         </button>
@@ -302,6 +303,7 @@ function WalletModal({
 // PORTFOLIO PAGE
 // ═══════════════════════════════════════════════════════════════════════
 export default function Portfolio() {
+    const {frontier} = useRiskMetrics();
     const {
         totalValue, totalReturn, holdings, snapshots, allocation, state,
         isLoading, isMutating, error: storeError,
@@ -357,16 +359,65 @@ export default function Portfolio() {
         return Object.entries(map).map(([name, value]) => ({ name, value: Math.round(value / total * 100) })).sort((a, b) => b.value - a.value);
     }, [holdings]);
 
+    // Markovitz
+    const optimalPortfolio = frontier.find(p => p.isOptimal);
+
+    const optimalWeights = optimalPortfolio?.weights || {};
+
+    const allocComparisonData = allocation.map(asset => ({
+    name: asset.ticker,
+    Current: +(asset.currentWeight * 100).toFixed(2),
+    Target: +((optimalWeights[asset.ticker] ?? 0) * 100).toFixed(2)
+    }));
+
+    const hasTargets = !!optimalPortfolio;
+
     // Snapshot chart data
+    function fillMissingDays(data) {
+        const filled = [];
+
+        for (let i = 0; i < data.length - 1; i++) {
+            const current = new Date(data[i].date);
+            const next = new Date(data[i + 1].date);
+
+            filled.push(data[i]);
+
+            let d = new Date(current);
+            d.setDate(d.getDate() + 1);
+
+            while (d < next) {
+                filled.push({
+                    date: d.toISOString(),
+                    value: data[i].value
+                });
+                d.setDate(d.getDate() + 1);
+            }
+        }
+
+        filled.push(data[data.length - 1]);
+        return filled;
+    }
+
     const perfData = useMemo(() => {
         const history = snapshots.map(s => ({
-            date: new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            date: new Date(s.date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+            }),
             value: Math.round(s.totalValue),
         }));
+
         if (totalValue) {
-            history.push({ date: "Now", value: Math.round(totalValue) });
+            history.push({
+                date: new Date().toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                }),
+                value: Math.round(totalValue)
+            });
         }
-        return history;
+
+        return fillMissingDays(history);
     }, [snapshots, totalValue]);
 
     const filteredPerfData = useMemo(() => {
@@ -375,17 +426,6 @@ export default function Portfolio() {
         const days = daysMap[range];
         return perfData.slice(-days);
     }, [range, perfData]);
-
-    // Current vs target allocation data
-    const allocComparisonData = useMemo(() =>
-        allocation.map(a => ({
-            name: a.ticker,
-            Current: Math.round(a.currentWeight * 10000) / 100,
-            Target: a.targetWeight != null ? Math.round(a.targetWeight * 10000) / 100 : null,
-        }))
-    , [allocation]);
-
-    const hasTargets = allocation.some(a => a.targetWeight != null);
 
     // ─── Handlers ────────────────────────────────────────────────────
     const handleAddAsset = async (data: AddAssetData) => {
@@ -450,14 +490,40 @@ export default function Portfolio() {
             {/* ─── Section 1: Header ──────────────────────────────────────── */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                 <div>
-                    <h1 className="text-h1 flex items-center gap-2">
-                        <Briefcase size={28} style={{ color: 'var(--color-accent-teal)' }} /> Portfolio
-                    </h1>
-                    <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-h1 flex items-center gap-2">
+                            <Briefcase size={28} style={{ color: 'var(--color-accent-teal)' }} />
+                            Portfolio
+                        </h1>
+
+                        {!isLoading && (
+                            <span
+                                className="px-3 py-1 rounded-full text-xs font-semibold"
+                                style={{
+                                    background: stateBg(portfolioState),
+                                    color: stateColor(portfolioState)
+                                }}
+                            >
+                                {stateLabel(portfolioState)}
+                            </span>
+                        )}
+                    </div>
+
+                    <p className="text-sm mt-1 flex items-center gap-3" style={{ color: 'var(--color-text-muted)' }}>
                         Manage your holdings and track allocation
+
+                        {!isLoading && state?.healthIndex != null && (
+                            <span className="text-xs">
+                                • Health {state.healthIndex}/100
+                            </span>
+                        )}
                     </p>
                 </div>
-                <button onClick={() => setShowAddAsset(true)} className="btn-primary text-sm flex items-center gap-2">
+
+                <button
+                    onClick={() => setShowAddAsset(true)}
+                    className="btn-primary text-sm flex items-center gap-2"
+                >
                     <Plus size={14} /> Add Holding
                 </button>
             </div>
@@ -468,29 +534,42 @@ export default function Portfolio() {
 
                     {/* Wallet */}
                     <GlassCard className="py-5">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                                    Available Cash
-                                </p>
-                                <p className="text-3xl font-bold font-numeric">
-                                    {formatCurrency(wallet?.balance ?? 0)}
-                                </p>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div
+                                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                                style={{ background: 'rgba(45, 212, 191, 0.12)' }}
+                            >
+                                <Wallet size={18} style={{ color: 'var(--color-accent-teal)' }} />
                             </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setShowDeposit(true)}
-                                    className="btn-secondary text-xs"
-                                >
-                                    Deposit
-                                </button>
-                                <button
-                                    onClick={() => setShowWithdraw(true)}
-                                    className="btn-secondary text-xs"
-                                >
-                                    Withdraw
-                                </button>
-                            </div>
+                            <p
+                                className="text-xs font-medium"
+                                style={{ color: 'var(--color-text-muted)' }}
+                            >
+                                Wallet Cash
+                            </p>
+                        </div>
+
+                        {isLoading ? (
+                            <SkeletonLoader height="h-10" />
+                        ) : (
+                            <p className="text-3xl font-bold font-numeric mb-3">
+                                {formatCurrency(wallet?.balance ?? 0)}
+                            </p>
+                        )}
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setShowDeposit(true)}
+                                className="btn-secondary flex-1 text-xs"
+                            >
+                                Deposit
+                            </button>
+                            <button
+                                onClick={() => setShowWithdraw(true)}
+                                className="btn-secondary flex-1 text-xs"
+                            >
+                                Withdraw
+                            </button>
                         </div>
                     </GlassCard>
 
@@ -501,7 +580,7 @@ export default function Portfolio() {
                                 style={{ background: 'rgba(45, 212, 191, 0.12)' }}>
                                 <DollarSign size={18} style={{ color: 'var(--color-accent-teal)' }} />
                             </div>
-                            <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Total Value</p>
+                            <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Portfolio Value</p>
                         </div>
                         {isLoading ? <SkeletonLoader height="h-10" /> : (
                             <CountUp end={totalValue ?? 0} prefix="$" separator="," decimals={2} className="text-3xl font-bold font-numeric" />
@@ -518,7 +597,7 @@ export default function Portfolio() {
                                     : <ArrowDownRight size={18} style={{ color: 'var(--color-danger)' }} />
                                 }
                             </div>
-                            <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Total Return</p>
+                            <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Portfolio Return</p>
                         </div>
                         {isLoading ? <SkeletonLoader height="h-10" /> : (
                             <p className="text-3xl font-bold font-numeric"
@@ -539,30 +618,6 @@ export default function Portfolio() {
                         </div>
                         {isLoading ? <SkeletonLoader height="h-10" /> : (
                             <CountUp end={holdings.length} className="text-3xl font-bold font-numeric" />
-                        )}
-                    </GlassCard>
-
-                    {/* Portfolio State */}
-                    <GlassCard className="py-5">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                                style={{ background: stateBg(portfolioState) }}>
-                                <Shield size={18} style={{ color: stateColor(portfolioState) }} />
-                            </div>
-                            <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Portfolio State</p>
-                        </div>
-                        {isLoading ? <SkeletonLoader height="h-10" /> : (
-                            <div>
-                                <span className="inline-block px-3 py-1 rounded-full text-sm font-semibold"
-                                    style={{ background: stateBg(portfolioState), color: stateColor(portfolioState) }}>
-                                    {stateLabel(portfolioState)}
-                                </span>
-                                {state?.healthIndex != null && (
-                                    <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                                        Health: {state.healthIndex}/100
-                                    </p>
-                                )}
-                            </div>
                         )}
                     </GlassCard>
                 </div>
@@ -757,16 +812,16 @@ export default function Portfolio() {
                 </div>
             )}
 
-            {/* Hidden for time being until work on it can be continued later */}
 
             {/* ─── Section 5: Current vs Target Allocation ────────────────── */}
-            {allocation.length > 0 && false && (
+            {allocation.length > 0 && (
                 <ScrollReveal>
                     <GlassCard>
                         <h2 className="text-h3 mb-4 flex items-center gap-2">
                             <Activity size={18} style={{ color: 'var(--color-accent-teal)' }} />
                             Current vs Target Allocation
                         </h2>
+
                         {hasTargets ? (
                             <Diagrams
                                 data={allocComparisonData}
@@ -778,7 +833,14 @@ export default function Portfolio() {
                             />
                         ) : (
                             <div className="py-10 text-center">
-                                <Activity size={36} style={{ color: 'var(--color-text-muted)', opacity: 0.3, margin: '0 auto 12px' }} />
+                                <Activity
+                                    size={36}
+                                    style={{
+                                        color: 'var(--color-text-muted)',
+                                        opacity: 0.3,
+                                        margin: '0 auto 12px'
+                                    }}
+                                />
                                 <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
                                     No target allocation set. Run a portfolio optimization to generate targets.
                                 </p>

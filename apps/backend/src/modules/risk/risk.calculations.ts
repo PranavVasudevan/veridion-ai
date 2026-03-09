@@ -273,9 +273,16 @@ export function efficientFrontier(
     const portRet = (w: number[]): number =>
         w.reduce((s, wi, i) => s + wi * annualReturns[i], 0);
 
+    // Deterministic pseudo-random generator
+    let seed = 42;
+    function seededRandom() {
+        seed = (seed * 1664525 + 1013904223) % 4294967296;
+        return seed / 4294967296;
+    }
+
     // Generate random Dirichlet-distributed weights (uniform on simplex)
     const randomWeights = (): number[] => {
-        const raw = Array.from({ length: n }, () => -Math.log(Math.random() + 1e-12));
+        const raw = Array.from({ length: n }, () => -Math.log(seededRandom() + 1e-12));
         const total = raw.reduce((s, v) => s + v, 0);
         return raw.map((v) => v / total);
     };
