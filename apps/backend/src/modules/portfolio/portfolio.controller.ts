@@ -2,12 +2,13 @@ import { Router, Request, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../../core/middleware/auth.middleware';
 import { asyncHandler, sendSuccess, sendCreated } from '../../core/utils/index';
 import { BadRequestError } from '../../core/errors';
+import { ensureAssetExists } from '../market-data/asset-discovery.service';
+import { ingestAssetPrices } from '../market-data/price-ingestion.service';
 import { portfolioService } from './portfolio.service';
 import * as holdingsService from './holdings.service';
 import * as allocationService from './allocation.service';
 import * as stateMachine from './state-machine';
 import { seedUserPortfolio } from './portfolio-seed.service';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../../infrastructure/prisma/client';
 
 export const portfolioController = Router();
@@ -180,19 +181,24 @@ portfolioController.post('/wallet/withdraw', asyncHandler(async (req, res) => {
 // TRADE EXECUTION
 // ═══════════════════════════════════════════════════════
 
-// POST /portfolio/trades/buy
 portfolioController.post('/trades/buy', asyncHandler(async (req, res) => {
 
   const userId = (req as AuthRequest).user.userId;
 
   const { ticker, quantity, price } = req.body;
 
-  if (!ticker || !quantity || !price) {
+  if (!ticker || quantity == null || price == null) {
     throw new BadRequestError("ticker, quantity and price are required");
   }
 
+  // Ensure asset exists using metadata pipeline
+  const asset = await ensureAssetExists(ticker);
+
+  // fetch historical prices if new asset
+  await ingestAssetPrices(asset.id, asset.ticker);
+
   const result = await portfolioService.executeBuy(userId, {
-    ticker,
+    ticker: asset.ticker,
     quantity: Number(quantity),
     price: Number(price)
   });

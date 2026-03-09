@@ -40,6 +40,7 @@ export async function detectBiases(userId: number): Promise<BiasDetectionResult>
         rebalancingActions,
         portfolioReturns,
         latestPortfolioSnapshot,
+        wallet
     ] = await Promise.all([
         prisma.holding.findMany({
             where: { userId },
@@ -71,6 +72,10 @@ export async function detectBiases(userId: number): Promise<BiasDetectionResult>
             where: { userId },
             orderBy: { snapshotDate: 'desc' }
         }),
+
+        prisma.wallet.findUnique({
+            where: { userId }
+        }),
     ]);
 
     const hasData =
@@ -95,14 +100,20 @@ export async function detectBiases(userId: number): Promise<BiasDetectionResult>
         };
     }
 
-    /* ───────────────── PORTFOLIO VALUE ───────────────── */
+    /* ───────────────── HOLDINGS VALUE ───────────────── */
 
-    const portfolioValue = latestPortfolioSnapshot
+    const holdingsValue = latestPortfolioSnapshot
         ? n(latestPortfolioSnapshot.totalValue)
         : holdings.reduce((s, h) => {
             const price = h.asset.prices[0] ? n(h.asset.prices[0].price) : n(h.avgCost);
             return s + n(h.quantity) * price;
-          }, 0);
+        }, 0);
+
+    /* ───────────────── WALLET VALUE ───────────────── */
+    const walletCash = wallet?.balance ? n(wallet.balance) : 0;
+
+    /* ───────────────── PORTFOLIO VALUE ───────────────── */
+    const portfolioValue = holdingsValue + walletCash;
 
     /* ───────────────── PANIC SELL SCORE ───────────────── */
     // Measures: how often you sell during/after portfolio drawdowns
@@ -270,13 +281,13 @@ export async function detectBiases(userId: number): Promise<BiasDetectionResult>
 
     /* ───────────────── LIQUIDITY STRESS SCORE ───────────────── */
     // Measures: ability to meet liquidity needs without selling core positions
-    // Stocks are liquid too — only penalise illiquid/locked assets heavily
 
     let liquidityStressScore = 30;
 
-    const LIQUID_TICKERS = ['CASH', 'USD', 'USDT', 'USDC', 'DAI', 'BUSD'];
-    const SEMI_LIQUID_TICKERS = ['BTC', 'ETH', 'SOL']; // Crypto: liquid but volatile
+    const LIQUID_TICKERS = ['CASH', 'USD', 'USDT', 'USDC', 'DAI', 'BUSD', 'INR'];
+    const SEMI_LIQUID_TICKERS = ['BTC', 'ETH', 'SOL'];
 
+    // ── Cash-like holdings
     const cashValue = holdings
         .filter(h => LIQUID_TICKERS.includes(h.asset.ticker?.toUpperCase() ?? ''))
         .reduce((s, h) => {
@@ -284,6 +295,7 @@ export async function detectBiases(userId: number): Promise<BiasDetectionResult>
             return s + n(h.quantity) * price;
         }, 0);
 
+    // ── Semi-liquid assets (large crypto)
     const semiLiquidValue = holdings
         .filter(h => SEMI_LIQUID_TICKERS.includes(h.asset.ticker?.toUpperCase() ?? ''))
         .reduce((s, h) => {
@@ -291,7 +303,7 @@ export async function detectBiases(userId: number): Promise<BiasDetectionResult>
             return s + n(h.quantity) * price;
         }, 0);
 
-    // Stocks are liquid — count them at 80% liquidity value
+    // ── Stocks / other assets
     const stockValue = holdings
         .filter(h => {
             const ticker = h.asset.ticker?.toUpperCase() ?? '';
@@ -299,15 +311,20 @@ export async function detectBiases(userId: number): Promise<BiasDetectionResult>
         })
         .reduce((s, h) => {
             const price = h.asset.prices[0] ? n(h.asset.prices[0].price) : n(h.avgCost);
-            return s + n(h.quantity) * price * 0.8; // 80% — accounts for sell friction
+            return s + n(h.quantity) * price;
         }, 0);
 
+    // ── Portfolio liquidity calculation
     if (portfolioValue > 0) {
-        const effectiveLiquidityRatio = (cashValue + semiLiquidValue * 0.7 + stockValue * 0.5) / portfolioValue;
 
-        // >50% effective liquidity = very low stress
-        // 20-50% = moderate
-        // <10% = high stress
+        const effectiveLiquidityRatio =
+            (
+                walletCash * 1.0 +        // fully liquid
+                cashValue * 1.0 +         // stable cash equivalents
+                semiLiquidValue * 0.7 +   // crypto
+                stockValue * 0.5          // equities
+            ) / portfolioValue;
+
         if (effectiveLiquidityRatio >= 0.50) liquidityStressScore = 15;
         else if (effectiveLiquidityRatio >= 0.30) liquidityStressScore = 30;
         else if (effectiveLiquidityRatio >= 0.20) liquidityStressScore = 45;

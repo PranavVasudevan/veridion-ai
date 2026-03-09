@@ -28,16 +28,20 @@ export async function executeBuy(userId: number, input: {
       }
     });
 
-    // Find asset
-    const asset = await tx.asset.findUnique({
+    let asset = await tx.asset.findUnique({
       where: { ticker: input.ticker.toUpperCase() }
     });
 
     if (!asset) {
-      throw new BadRequestError("Asset not found");
+      asset = await tx.asset.create({
+        data: {
+          ticker: input.ticker.toUpperCase(),
+          name: input.ticker,
+          assetType: "stock"
+        }
+      });
     }
 
-    // Upsert holding
     const existing = await tx.holding.findUnique({
       where: {
         userId_assetId: {
@@ -49,12 +53,19 @@ export async function executeBuy(userId: number, input: {
 
     if (existing) {
 
-      const newQty = existing.quantity.toNumber() + input.quantity;
+      const oldQty = existing.quantity.toNumber();
+      const oldAvg = existing.avgCost?.toNumber() ?? 0;
+
+      const newQty = oldQty + input.quantity;
+
+      const newAvgCost =
+        ((oldQty * oldAvg) + (input.quantity * input.price)) / newQty;
 
       await tx.holding.update({
         where: { id: existing.id },
         data: {
           quantity: new Decimal(newQty),
+          avgCost: new Decimal(newAvgCost),
           lastUpdated: new Date()
         }
       });
@@ -73,7 +84,7 @@ export async function executeBuy(userId: number, input: {
     }
 
     const total = input.quantity * input.price;
-    // Record trade
+
     await tx.trade.create({
       data: {
         userId,
